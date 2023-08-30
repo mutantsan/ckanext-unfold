@@ -1,0 +1,14 @@
+# unfold-js:
+#   filter: rjsmin
+#   output: ckanext-unfold/%(version)s-unfold.js
+#   contents:
+#     - js/unfold.js
+#   extra:
+#     preload:
+#       - base/main
+
+# unfold-css:
+#   filter: cssrewrite
+#   output: ckanext-unfold/%(version)s-unfold.css
+#   contents:
+#     - css/unfold.css
