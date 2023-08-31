@@ -16,7 +16,6 @@ def build_directory_tree(filepath: str):
     for entry in file_list:
         nodes.append(_build_node(entry))
 
-    import ipdb; ipdb.set_trace()
     return nodes
 
 
