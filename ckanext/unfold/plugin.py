@@ -6,6 +6,7 @@ import ckan.plugins as plugins
 import ckan.plugins.toolkit as tk
 from ckan.types import Context, DataDict
 
+import ckanext.unfold.adapters as unf_adapters
 from ckanext.unfold.logic.schema import get_preview_schema
 
 
@@ -35,7 +36,7 @@ class UnfoldPlugin(plugins.SingletonPlugin):
         }
 
     def can_view(self, data_dict: DataDict) -> bool:
-        return data_dict["resource"].get("format", "").lower() in ["7z", "rar", "cbr"]
+        return data_dict["resource"].get("format", "").lower() in unf_adapters.ADAPTERS
 
     def view_template(self, context: Context, data_dict: DataDict) -> str:
         return "unfold_preview.html"
