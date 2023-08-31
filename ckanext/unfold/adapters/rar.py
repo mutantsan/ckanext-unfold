@@ -130,7 +130,7 @@ def _build_node(entry: RarInfo) -> dict[str, Any]:
         # "timestamp": entry.mtime.isoformat(),
         "size": entry.compress_size,
         "icon": "fa fa-folder" if entry.isdir() else _get_icon_by_format(fmt),
-        'state' : { 'opened' : True},
+        "state": {"opened": True},
         # "children": [],
         # "rarInfo": entry,
         "parent": "/".join(parts[:-1]) + "/" if parts[:-1] else "#",
@@ -150,12 +150,16 @@ def _get_format_from_name(name: str) -> str:
 def _get_icon_by_format(fmt: str) -> str:
     default_icon = "fa fa-file"
     icons = {
-        ("csv"): "fa fa-file-csv",
+        ("csv",): "fa fa-file-csv",
         ("txt", "tsv"): "fa fa-file-text",
         ("xls", "xlsx"): "fa fa-file-excel",
         ("doc", "docx"): "fa  fa-file-word",
         ("png", "jpeg", "jpg", "svg", "bmp"): "fa fa-file-image",
-        ("7z", "rar", "zip"): "fa fa-file-archive",
+        ("7z", "rar", "zip", "gzip", "gz", "tar", "deb", "cbr"): "fa fa-file-archive",
+        ("pdf",): "fa fa-file-pdf",
+        ("json", "xhtml", "py", "css", "rs", "html", "php", "sql"): "fa fa-file-code",
+        ("xml", "dtd"): "fa fa-file-contract",
+        ("mp3", "wav"): "fa fa-file-audio"
     }
 
     for formats, icon in icons.items():

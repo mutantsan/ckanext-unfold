@@ -17,6 +17,9 @@ ckan.module("unfold-init-jstree", function ($, _) {
                 'core': {
                     'data': this.options.data
                 },
+                "search": {
+                    "show_only_matches": true,
+                },
                 "plugins": [
                     "search"
                 ]
