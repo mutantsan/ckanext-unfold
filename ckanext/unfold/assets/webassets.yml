@@ -7,11 +7,11 @@ unfold-js:
     preload:
       - base/main
 
-# unfold-css:
-#   filter: cssrewrite
-#   output: ckanext-unfold/%(version)s-unfold.css
-#   contents:
-#     - css/unfold.css
+unfold-css:
+  filter: cssrewrite
+  output: ckanext-unfold/%(version)s-unfold.css
+  contents:
+    - css/unfold.css
 
 
 jstree-js:

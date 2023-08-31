@@ -1,7 +1,17 @@
 {% set archive_tree = h.get_archive_tree(resource) %}
 
+<div class="ckanext-jstree-search">
+    <div class="jstree-search--input">
+        <label class="d-none" for="field-sitewide-search">{{ _('Search') }}</label>
+        <input id="jstree-search" class="form-control me-2"  type="text" name="jstree-search" placeholder="{{ _('Search') }}" aria-label="{{ _('Search') }}"/>
+        <span class="search-icon" aria-label="{{ _('Search icon') }}"><i class="fa fa-search"></i></span>
+    </div>
 
-<div class="input" id="jstree-search"></div>
+    <div class="jstree-search--clear">
+        <button class="btn btn-primary" id="jstree-search-clear">{{ _("Clear") }}</button>
+    </div>
+</div>
+
 <div id="treeDemo" data-module="unfold-init-jstree" data-module-data="{{ archive_tree }}">
 
 </div>

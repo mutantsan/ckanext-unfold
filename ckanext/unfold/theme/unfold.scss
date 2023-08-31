@@ -1,0 +1,22 @@
+.ckanext-jstree-search {
+    margin-bottom: 12px;
+    display: flex;
+
+    .jstree-search--input {
+        display: flex;
+        position: relative;
+        flex-basis: 350px;
+
+        .search-icon {
+            display: flex;
+            position: absolute;
+            right: 20px;
+            top: 10px;
+        }
+
+    }
+}
+
+.jstree-default .jstree-search {
+    background: bisque;
+}
