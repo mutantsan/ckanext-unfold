@@ -35,7 +35,7 @@ class UnfoldPlugin(plugins.SingletonPlugin):
         }
 
     def can_view(self, data_dict: DataDict) -> bool:
-        return data_dict["resource"].get("format", "").lower() in ["7z", "rar"]
+        return data_dict["resource"].get("format", "").lower() in ["7z", "rar", "cbr"]
 
     def view_template(self, context: Context, data_dict: DataDict) -> str:
         return "unfold_preview.html"

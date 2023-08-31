@@ -151,7 +151,7 @@ def _get_icon_by_format(fmt: str) -> str:
     default_icon = "fa fa-file"
     icons = {
         ("csv",): "fa fa-file-csv",
-        ("txt", "tsv"): "fa fa-file-text",
+        ("txt", "tsv", "ini", "nfo"): "fa fa-file-text",
         ("xls", "xlsx"): "fa fa-file-excel",
         ("doc", "docx"): "fa  fa-file-word",
         ("png", "jpeg", "jpg", "svg", "bmp"): "fa fa-file-image",

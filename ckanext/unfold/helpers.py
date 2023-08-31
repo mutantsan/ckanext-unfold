@@ -35,9 +35,12 @@ def get_archive_tree(resource: dict[str, Any]) -> Any:
 
 
 def parse_archive(fmt: str, filepath):
-    adapters = {"rar": rar.build_directory_tree}
+    adapters = {
+        "rar": rar.build_directory_tree,
+        "cbr": rar.build_directory_tree
+    }
 
     if fmt not in adapters:
-        raise TypeError("No adapter for `{fmt}` archives")
+        raise TypeError(f"No adapter for `{fmt}` archives")
 
     return adapters[fmt](filepath)
