@@ -10,7 +10,7 @@ from typing import Any
 
 import ckan.lib.uploader as uploader
 
-from ckanext.unfold.adapters import rar
+import ckanext.unfold.adapters as unf_adapters
 
 log = logging.getLogger(__name__)
 
@@ -19,10 +19,8 @@ def get_archive_tree(resource: dict[str, Any]) -> Any:
     if resource.get("url_type") == "upload":
         upload = uploader.get_resource_uploader(resource)
         filepath = upload.get_path(resource["id"])
-
-        # with open(filepath) as f:
-        #     data = f.read()
     else:
+        # TODO: implement remote resource support
         if resource.get("url"):
             try:
                 resp = requests.get(resource["url"])
@@ -36,8 +34,9 @@ def get_archive_tree(resource: dict[str, Any]) -> Any:
 
 def parse_archive(fmt: str, filepath):
     adapters = {
-        "rar": rar.build_directory_tree,
-        "cbr": rar.build_directory_tree
+        "rar": unf_adapters.rar.build_directory_tree,
+        "cbr": unf_adapters.rar.build_directory_tree,
+        "7z": unf_adapters._7z.build_directory_tree
     }
 
     if fmt not in adapters:
