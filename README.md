@@ -6,7 +6,9 @@ Preview for different archive formats
 
 ## What are the dependencies?
 
-### RAR
+Working with different archive formats requires different tools:
+
+### RAR, CBR
 
 It depends on `unrar` command-line utility to do the actual decompression. Note that by default it expect it to be in `PATH`.
 If unrar launching fails, you need to fix this.
