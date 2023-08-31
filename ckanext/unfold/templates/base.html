@@ -1,0 +1,14 @@
+{% ckan_extends %}
+
+{% block scripts %}
+    {{ super() }}
+
+    {% asset 'unfold/jstree-js' %}
+    {% asset 'unfold/unfold-js' %}
+{% endblock %}
+
+{% block styles %}
+    {{ super() }}
+
+    {% asset 'unfold/jstree-css' %}
+{% endblock %}
