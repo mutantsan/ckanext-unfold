@@ -3,8 +3,11 @@ from __future__ import annotations
 import logging
 import tarfile
 from datetime import datetime as dt
-from tarfile import TarError, TarInfo
+from tarfile import TarError, TarFile, TarInfo
 from typing import Any, Optional
+from io import BytesIO
+
+import requests
 
 import ckan.plugins.toolkit as tk
 
@@ -14,12 +17,17 @@ import ckanext.unfold.utils as unf_utils
 log = logging.getLogger(__name__)
 
 
-def build_directory_tree(filepath: str, compression: Optional[str] = None):
+def build_directory_tree(
+    filepath: str, remote: Optional[bool] = False, compression: Optional[str] = None
+):
     mode = "r" if not compression else f"r:{compression}"
 
     try:
-        with tarfile.open(filepath, mode) as archive:
-            file_list: list[TarInfo] = archive.getmembers()
+        if remote:
+            file_list = get_tarlist_from_url(filepath)
+        else:
+            with tarfile.open(filepath, mode) as archive:
+                file_list: list[TarInfo] = archive.getmembers()
     except TarError as e:
         log.error(f"Error openning rar archive: {e}")
         return []
@@ -58,3 +66,12 @@ def _prepare_table_data(entry: TarInfo) -> dict[str, Any]:
         "format": fmt,
         "modified_at": modified_at,
     }
+
+
+def get_tarlist_from_url(url) -> list[TarInfo]:
+    """Download an archive and fetch a file list. Tar file doesn't allow us
+    to download it partially and fetch only file list, because the information
+    about each file is stored at the beggining of the file"""
+    resp = requests.get(url)
+
+    return TarFile(fileobj=BytesIO(resp.content)).getmembers()

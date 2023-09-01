@@ -41,4 +41,4 @@ def parse_archive(
     if fmt not in unf_adapters.ADAPTERS:
         raise TypeError(f"No adapter for `{fmt}` archives")
 
-    return unf_adapters.ADAPTERS[fmt](filepath, remote)
+    return unf_adapters.ADAPTERS[fmt](filepath, remote=remote)
