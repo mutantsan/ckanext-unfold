@@ -11,6 +11,7 @@ from rarfile import RarInfo
 
 import ckan.plugins.toolkit as tk
 
+import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
 
@@ -26,15 +27,15 @@ def build_directory_tree(
         else:
             with rarfile.RarFile(filepath) as archive:
                 if archive.needs_password():
-                    return []
+                    raise unf_exception.UnfoldError(
+                        f"Archive is protected with password"
+                    )
 
                 file_list: list[RarInfo] = archive.infolist()
     except RarError as e:
-        log.error(f"Error openning archive: {e}")
-        return []
+        raise unf_exception.UnfoldError(f"Error openning archive: {e}")
     except requests.RequestException as e:
-        log.error(f"Error fetching remote archive: {e}")
-        return []
+        raise unf_exception.UnfoldError(f"Error fetching remote archive: {e}")
 
     nodes: list[unf_types.Node] = []
 

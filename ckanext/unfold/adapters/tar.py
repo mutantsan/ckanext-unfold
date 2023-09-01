@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import tarfile
 from datetime import datetime as dt
+from io import BytesIO
 from tarfile import TarError, TarFile, TarInfo
 from typing import Any, Optional
-from io import BytesIO
 
 import requests
 

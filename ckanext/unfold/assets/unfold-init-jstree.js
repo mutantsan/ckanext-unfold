@@ -3,11 +3,12 @@ ckan.module("unfold-init-jstree", function ($, _) {
     return {
         options: {
             data: null,
+            resourceId: null,
         },
 
         initialize: function () {
-            $.proxyAll(this, /_on/);
-
+            $.proxyAll(this, /_/);
+            var self = this;
             this.tree = $(this.el)
 
             $("#jstree-search").on("change", this._onSearch);
@@ -15,7 +16,12 @@ ckan.module("unfold-init-jstree", function ($, _) {
 
             $(this.el).jstree({
                 core: {
-                    data: this.options.data,
+                    data: {
+                        dataType: "json",
+                        url: this.sandbox.url("/api/action/get_archive_structure"),
+                        data: this._preparePayload,
+                        error: this._onErrorRequest
+                    },
                     themes: {
                         dots: false
                     }
@@ -25,11 +31,11 @@ ckan.module("unfold-init-jstree", function ($, _) {
                 },
                 table: {
                     columns: [
-                        {width: 400, header: "Name"},
-                        {width: 100, header: "Size", value: "size"},
-                        {width: 100, header: "Type", value: "type"},
-                        {width: 100, header: "Format", value: "format"},
-                        {width: 100, header: "Modified at", value: "modified_at"}
+                        { width: 400, header: "Name" },
+                        { width: 100, header: "Size", value: "size" },
+                        { width: 100, header: "Type", value: "type" },
+                        { width: 100, header: "Format", value: "format" },
+                        { width: 100, header: "Modified at", value: "modified_at" }
                     ],
                     resizable: true,
                     height: 700
@@ -46,6 +52,19 @@ ckan.module("unfold-init-jstree", function ($, _) {
 
         _onClearSearch: function (e) {
             $("#jstree-search").val("").trigger("change");
+        },
+
+        _preparePayload: function () {
+            return { "id": this.options.resourceId };
+        },
+
+        _onErrorRequest: function (xhr, status, error) {
+            let errMsg = xhr.responseJSON.error;
+
+            $(this.el).jstree(true).settings.plugins = [];
+            $(this.el).jstree(true).destroy();
+
+            $("#archive-tree-error").text("Error: " + errMsg)
         }
     };
 });

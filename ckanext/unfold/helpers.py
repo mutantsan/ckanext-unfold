@@ -13,7 +13,7 @@ import ckanext.unfold.utils as unf_utils
 log = logging.getLogger(__name__)
 
 
-def get_archive_tree(resource: dict[str, Any]) -> str | None:
+def get_archive_tree(resource: dict[str, Any]) -> list[unf_types.Node]:
     remote = False
 
     if resource.get("url_type") == "upload":
@@ -21,7 +21,7 @@ def get_archive_tree(resource: dict[str, Any]) -> str | None:
         filepath = upload.get_path(resource["id"])
     else:
         if not resource.get("url"):
-            return
+            return []
 
         filepath = resource["url"]
         remote = True
@@ -30,9 +30,9 @@ def get_archive_tree(resource: dict[str, Any]) -> str | None:
 
     if not tree:
         tree = parse_archive(resource["format"].lower(), filepath, remote)
-        unf_utils.save_archive_structure(tree, resource["id"])
+        # unf_utils.save_archive_structure(tree, resource["id"])
 
-    return json.dumps(tree) if tree else None
+    return tree
 
 
 def parse_archive(
