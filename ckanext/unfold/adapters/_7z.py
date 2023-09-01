@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import ckan.plugins.toolkit as tk
 import py7zr
 from py7zr import FileInfo, exceptions
+
+import ckan.plugins.toolkit as tk
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils

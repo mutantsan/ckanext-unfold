@@ -6,8 +6,9 @@ from io import BytesIO
 from typing import Any, Optional
 from zipfile import BadZipFile, LargeZipFile, ZipFile, ZipInfo
 
-import ckan.plugins.toolkit as tk
 import requests
+
+import ckan.plugins.toolkit as tk
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils

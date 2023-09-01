@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
 from io import BytesIO
+from typing import Any, Optional
 
-import requests
 import rarfile
+import requests
 from rarfile import Error as RarError
 from rarfile import RarInfo
 
 import ckan.plugins.toolkit as tk
-
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
