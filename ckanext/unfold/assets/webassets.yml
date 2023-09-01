@@ -4,6 +4,7 @@ unfold-js:
   contents:
     - unfold-init-jstree.js
     - vendor/jstree.min.js
+    - vendor/jstree-table.js
   extra:
     preload:
       - base/main

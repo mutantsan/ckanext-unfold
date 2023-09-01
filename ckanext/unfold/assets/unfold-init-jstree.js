@@ -9,6 +9,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
             $.proxyAll(this, /_on/);
 
             this.tree = $(this.el)
+            const tree = this.tree;
 
             $("#jstree-search").on("change", this._onSearch);
             $("#jstree-search-clear").click(this._onClearSearch);
@@ -17,11 +18,22 @@ ckan.module("unfold-init-jstree", function ($, _) {
                 'core': {
                     'data': this.options.data
                 },
-                "search": {
+                search: {
                     "show_only_matches": true,
                 },
-                "plugins": [
-                    "search", "wholerow"
+                table: {
+                    columns: [
+                        {width: 400, header: "Name"},
+                        {width: 100, header: "Size", value: "size"},
+                        {width: 100, header: "Type", value: "type"},
+                        {width: 100, header: "Format", value: "format"},
+                        {width: 100, header: "Modified at", value: "modified_at"}
+                    ],
+                    // resizable: true,
+                    columnWidth: 100
+                },
+                plugins: [
+                    "search", "wholerow", "table", "sort"
                 ]
             });
         },

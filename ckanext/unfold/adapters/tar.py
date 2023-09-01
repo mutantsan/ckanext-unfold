@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 import tarfile
 from tarfile import TarError, TarInfo
-from typing import Optional
+from typing import Optional, Any
+from datetime import datetime as dt
+
+import ckan.plugins.toolkit as tk
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
@@ -36,17 +39,22 @@ def _build_node(entry: TarInfo) -> unf_types.Node:
 
     return unf_types.Node(
         id=entry.name or "",
-        text=_get_node_text(entry),
+        text=unf_utils.name_from_path(entry.name),
         icon="fa fa-folder" if entry.isdir() else unf_utils.get_icon_by_format(fmt),
         state={"opened": True},
         parent="/".join(parts[:-1]) if parts[:-1] else "#",
+        data=_prepare_table_data(entry),
     )
 
 
-def _get_node_text(entry: TarInfo):
-    if entry.isdir():
-        return unf_utils.name_from_path(entry.name)
+def _prepare_table_data(entry: TarInfo) -> dict[str, Any]:
+    name = unf_utils.name_from_path(entry.name)
+    fmt = "" if entry.isdir() else unf_utils.get_format_from_name(name)
+    modified_at = tk.h.render_datetime(dt.fromtimestamp(entry.mtime), with_hours=True)
 
-    file_size = unf_utils.printable_file_size(entry.size or 0)
-
-    return f"{unf_utils.name_from_path(entry.name)} ({file_size})"
+    return {
+        "size": unf_utils.printable_file_size(entry.size) if entry.size else "",
+        "type": "folder" if entry.isdir() else "file",
+        "format": fmt,
+        "modified_at": modified_at,
+    }

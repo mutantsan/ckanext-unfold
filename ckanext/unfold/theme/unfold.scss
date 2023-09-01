@@ -34,6 +34,20 @@
     }
 }
 
+.jstree-table-header:last-of-type {
+    .jstree-table-separator {
+        display: none;
+    }
+}
+
+.jstree-table-wrapper {
+    .jstree-table-headerwrapper,
+    .jstree-table-midwrapper {
+        width: -webkit-fill-available;
+        display: table;
+    }
+}
+
 .unfold-preview {
     max-height: 700px;
     overflow: auto;
