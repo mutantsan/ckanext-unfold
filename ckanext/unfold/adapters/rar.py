@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
+from io import BytesIO
 
-import ckan.plugins.toolkit as tk
+import requests
 import rarfile
 from rarfile import Error as RarError
 from rarfile import RarInfo
+
+import ckan.plugins.toolkit as tk
+
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
@@ -14,12 +18,23 @@ import ckanext.unfold.utils as unf_utils
 log = logging.getLogger(__name__)
 
 
-def build_directory_tree(filepath: str):
+def build_directory_tree(
+    filepath: str, remote: Optional[bool] = False
+) -> list[unf_types.Node]:
     try:
-        with rarfile.RarFile(filepath) as archive:
-            file_list: list[RarInfo] = archive.infolist()
+        if remote:
+            file_list = get_rarlist_from_url(filepath)
+        else:
+            with rarfile.RarFile(filepath) as archive:
+                if archive.needs_password():
+                    return []
+
+                file_list: list[RarInfo] = archive.infolist()
     except RarError as e:
-        log.error(f"Error openning rar archive: {e}")
+        log.error(f"Error openning archive: {e}")
+        return []
+    except requests.RequestException as e:
+        log.error(f"Error fetching remote archive: {e}")
         return []
 
     nodes: list[unf_types.Node] = []
@@ -58,3 +73,11 @@ def _prepare_table_data(entry: RarInfo) -> dict[str, Any]:
         "format": fmt,
         "modified_at": modified_at,
     }
+
+
+def get_rarlist_from_url(url) -> list[RarInfo]:
+    """Download an archive and fetch a file list. Rar file doesn't allow us
+    to download it partially and fetch only file list."""
+    resp = requests.get(url)
+
+    return rarfile.RarFile(BytesIO(resp.content)).infolist()

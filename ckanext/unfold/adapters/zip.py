@@ -25,10 +25,10 @@ def build_directory_tree(
             with ZipFile(filepath) as archive:
                 file_list: list[ZipInfo] = archive.infolist()
     except (LargeZipFile, BadZipFile) as e:
-        log.error(f"Error openning zip archive: {e}")
+        log.error(f"Error openning archive: {e}")
         return []
     except requests.RequestException as e:
-        log.error(f"Error fetching remote zip archive: {e}")
+        log.error(f"Error fetching remote archive: {e}")
         return []
 
     nodes: list[unf_types.Node] = []
