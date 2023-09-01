@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import tarfile
 from tarfile import TarError, TarInfo
+from typing import Optional
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
@@ -10,9 +11,11 @@ import ckanext.unfold.utils as unf_utils
 log = logging.getLogger(__name__)
 
 
-def build_directory_tree(filepath: str, gz: bool = False):
+def build_directory_tree(filepath: str, compression: Optional[str] = None):
+    mode = "r" if not compression else f"r:{compression}"
+
     try:
-        with tarfile.open(filepath, "r:gz" if gz else "r") as archive:
+        with tarfile.open(filepath, mode) as archive:
             file_list: list[TarInfo] = archive.getmembers()
     except TarError as e:
         log.error(f"Error openning rar archive: {e}")

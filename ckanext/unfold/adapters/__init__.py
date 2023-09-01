@@ -10,5 +10,7 @@ ADAPTERS = {
     "gz": gzip.build_directory_tree,
     "gzip": gzip.build_directory_tree,
     "tar": partial(tar.build_directory_tree),
-    "tar.gz": partial(tar.build_directory_tree, gz=True),
+    "tar.gz": partial(tar.build_directory_tree, compression="gz"),
+    "tar.xz": partial(tar.build_directory_tree, compression="xz"),
+    "tar.bz2": partial(tar.build_directory_tree, compression="bz2"),
 }
