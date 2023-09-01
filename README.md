@@ -35,6 +35,10 @@ especially the dependencies section.
 
 We are using built-in library [`zipfile`](https://docs.python.org/3/library/zipfile.html). Please consider referring to the official documentation for more information.
 
+### TAR
+
+We are using built-in library [`tarfile`](https://docs.python.org/3/library/tarfile.html). Please consider referring to the official documentation for more information.
+
 ## Config settings
 
 TODO
