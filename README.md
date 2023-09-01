@@ -3,6 +3,10 @@
 # ckanext-unfold
 
 Preview for different archive formats
+### TODO
+    * implement remote support for tar, 7z
+    * add password support for all adapters
+
 
 ## What are the dependencies?
 
