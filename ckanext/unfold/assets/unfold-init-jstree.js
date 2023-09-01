@@ -31,8 +31,8 @@ ckan.module("unfold-init-jstree", function ($, _) {
                         {width: 100, header: "Format", value: "format"},
                         {width: 100, header: "Modified at", value: "modified_at"}
                     ],
-                    // resizable: true,
-                    columnWidth: 100
+                    resizable: true,
+                    height: 700
                 },
                 plugins: [
                     "search", "table", "sort"

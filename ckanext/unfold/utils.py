@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import pathlib
 
 from ckan.lib.redis import connect_to_redis
 
@@ -37,7 +38,8 @@ def name_from_path(path: str | None) -> str:
 
 
 def get_format_from_name(name: str) -> str:
-    return name.split(".")[-1]
+    suffixes = pathlib.Path(name).suffixes
+    return "".join(suffixes).strip(".")
 
 
 def printable_file_size(size_bytes: int) -> str:
