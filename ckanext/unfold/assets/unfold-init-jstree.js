@@ -21,7 +21,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
                     "show_only_matches": true,
                 },
                 "plugins": [
-                    "search"
+                    "search", "wholerow"
                 ]
             });
         },
