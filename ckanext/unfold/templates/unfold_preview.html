@@ -3,12 +3,15 @@
 <div class="ckanext-jstree-search">
     <div class="jstree-search--input">
         <label class="d-none" for="field-sitewide-search">{{ _('Search') }}</label>
-        <input id="jstree-search" class="form-control me-2"  type="text" name="jstree-search" placeholder="{{ _('Search') }}" aria-label="{{ _('Search') }}"/>
-        <span class="search-icon" aria-label="{{ _('Search icon') }}"><i class="fa fa-search"></i></span>
+        <input id="jstree-search" class="form-control"  type="text" name="jstree-search" placeholder="{{ _('Search') }}" aria-label="{{ _('Search') }}"/>
+        <button class="btn search-icon" type="submit" aria-label="{{ _('Search icon') }}"><i class="fa fa-search"></i></button>
     </div>
 
     <div class="jstree-search--clear">
-        <button class="btn btn-primary" id="jstree-search-clear">{{ _("Clear") }}</button>
+        <button class="btn btn-primary" id="jstree-search-clear">
+            <i class="fa fa-close"></i>
+            {{ _("Clear") }}
+        </button>
     </div>
 </div>
 
