@@ -5,9 +5,8 @@ import logging
 import py7zr
 from py7zr import FileInfo, exceptions
 
-import ckanext.unfold.utils as unf_utils
 import ckanext.unfold.types as unf_types
-
+import ckanext.unfold.utils as unf_utils
 
 log = logging.getLogger(__name__)
 

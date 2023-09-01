@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-from zipfile import ZipFile, ZipInfo, LargeZipFile, BadZipFile
+from zipfile import BadZipFile, LargeZipFile, ZipFile, ZipInfo
 
-import ckanext.unfold.utils as unf_utils
 import ckanext.unfold.types as unf_types
+import ckanext.unfold.utils as unf_utils
 
 log = logging.getLogger(__name__)
 

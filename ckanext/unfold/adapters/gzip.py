@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ckan import model as model
+
 import ckanext.unfold.types as unf_types
 
 

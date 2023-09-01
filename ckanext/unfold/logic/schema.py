@@ -4,7 +4,6 @@ from typing import Any, Dict
 
 from ckan.logic.schema import validator_args
 
-
 Schema = Dict[str, Any]
 
 

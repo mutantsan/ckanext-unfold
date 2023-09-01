@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 
 import rarfile
-from rarfile import RarInfo, Error as RarError
+from rarfile import Error as RarError
+from rarfile import RarInfo
 
-import ckanext.unfold.utils as unf_utils
 import ckanext.unfold.types as unf_types
+import ckanext.unfold.utils as unf_utils
 
 log = logging.getLogger(__name__)
 

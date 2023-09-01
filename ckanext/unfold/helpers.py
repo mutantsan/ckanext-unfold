@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import logging
 import json
-
-import requests
-from requests.exceptions import RequestException
-
+import logging
 from typing import Any
 
 import ckan.lib.uploader as uploader
+import requests
+from requests.exceptions import RequestException
 
 import ckanext.unfold.adapters as unf_adapters
 import ckanext.unfold.types as unf_types
