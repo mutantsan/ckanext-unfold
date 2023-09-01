@@ -20,6 +20,16 @@ decompression backend. From those unar is preferred as bsdtar has very limited s
 It depends on [cryptography](https://pypi.org/project/cryptography/) or [PyCryptodome](https://pypi.org/project/pycryptodome/)
 modules to process archives with password-protected headers.
 
+### 7Z
+
+We are using [`py7zr`](https://py7zr.readthedocs.io/) library.
+
+The py7zr depends on several external libraries. You should install these libraries with py7zr.
+There are `PyCryptodome`, `PyZstd`, `PyPPMd`, `bcj-cffi`, `texttable`, and `multivolumefile`.
+These packages are automatically installed when installing with pip command.
+
+For extra information, please visit the [official documentation](https://py7zr.readthedocs.io/en/latest/user_guide.html#dependencies),
+especially the dependencies section.
 
 ## Config settings
 
