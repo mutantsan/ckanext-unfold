@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import tarfile
-from tarfile import TarError, TarInfo
-from typing import Optional, Any
 from datetime import datetime as dt
+from tarfile import TarError, TarInfo
+from typing import Any, Optional
 
 import ckan.plugins.toolkit as tk
 

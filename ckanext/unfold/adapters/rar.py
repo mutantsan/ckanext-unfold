@@ -3,11 +3,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import ckan.plugins.toolkit as tk
 import rarfile
 from rarfile import Error as RarError
 from rarfile import RarInfo
-
-import ckan.plugins.toolkit as tk
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils

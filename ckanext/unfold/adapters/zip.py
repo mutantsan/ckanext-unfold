@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime as dt
 from typing import Any
 from zipfile import BadZipFile, LargeZipFile, ZipFile, ZipInfo
-from datetime import datetime as dt
 
 import ckan.plugins.toolkit as tk
 
@@ -47,7 +47,9 @@ def _build_node(entry: ZipInfo) -> unf_types.Node:
 def _prepare_table_data(entry: ZipInfo) -> dict[str, Any]:
     name = unf_utils.name_from_path(entry.filename)
     fmt = "" if entry.is_dir() else unf_utils.get_format_from_name(name)
-    modified_at = tk.h.render_datetime(dt(*entry.date_time), date_format="%d/%m/%Y - %H:%M")
+    modified_at = tk.h.render_datetime(
+        dt(*entry.date_time), date_format="%d/%m/%Y - %H:%M"
+    )
 
     return {
         "size": unf_utils.printable_file_size(entry.compress_size)

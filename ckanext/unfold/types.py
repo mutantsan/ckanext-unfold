@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypedDict, Optional, Any
+from typing import Any, Optional, TypedDict
 
 
 class Node(TypedDict, total=False):
