@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime as dt
-from typing import Any
+from io import BytesIO
+from typing import Any, Optional
 from zipfile import BadZipFile, LargeZipFile, ZipFile, ZipInfo
 
 import ckan.plugins.toolkit as tk
+import requests
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
@@ -13,12 +15,20 @@ import ckanext.unfold.utils as unf_utils
 log = logging.getLogger(__name__)
 
 
-def build_directory_tree(filepath: str) -> list[unf_types.Node]:
+def build_directory_tree(
+    filepath: str, remote: Optional[bool] = False
+) -> list[unf_types.Node]:
     try:
-        with ZipFile(filepath) as archive:
-            file_list: list[ZipInfo] = archive.infolist()
+        if remote:
+            file_list = get_ziplist_from_url(filepath)
+        else:
+            with ZipFile(filepath) as archive:
+                file_list: list[ZipInfo] = archive.infolist()
     except (LargeZipFile, BadZipFile) as e:
         log.error(f"Error openning zip archive: {e}")
+        return []
+    except requests.RequestException as e:
+        log.error(f"Error fetching remote zip archive: {e}")
         return []
 
     nodes: list[unf_types.Node] = []
@@ -59,3 +69,30 @@ def _prepare_table_data(entry: ZipInfo) -> dict[str, Any]:
         "format": fmt,
         "modified_at": modified_at,
     }
+
+
+def get_ziplist_from_url(url) -> list[ZipInfo]:
+    head = requests.head(url)
+    end = None
+
+    if "content-length" in head.headers:
+        end = int(head.headers["content-length"])
+
+    if "content-range" in head.headers:
+        end = int(head.headers["content-range"].split("/")[1])
+
+    if not end:
+        return []
+
+    return _get_remote_zip_infolist(url, end - 65536, end)
+
+
+def _get_remote_zip_infolist(url: str, start, end) -> list[ZipInfo]:
+    resp = requests.get(
+        url,
+        headers={
+            "Range": "bytes={}-{}".format(start, end),
+        },
+    )
+
+    return ZipFile(BytesIO(resp.content)).infolist()

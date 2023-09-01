@@ -9,7 +9,6 @@ ckan.module("unfold-init-jstree", function ($, _) {
             $.proxyAll(this, /_on/);
 
             this.tree = $(this.el)
-            const tree = this.tree;
 
             $("#jstree-search").on("change", this._onSearch);
             $("#jstree-search-clear").click(this._onClearSearch);
