@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import logging
+
 import rarfile
-from rarfile import RarInfo
+from rarfile import RarInfo, Error as RarError
 
 import ckanext.unfold.utils as unf_utils
 import ckanext.unfold.types as unf_types
 
+log = logging.getLogger(__name__)
+
 
 def build_directory_tree(filepath: str):
-    with rarfile.RarFile(filepath) as archive:
-        file_list: list[RarInfo] = archive.infolist()
+    try:
+        with rarfile.RarFile(filepath) as archive:
+            file_list: list[RarInfo] = archive.infolist()
+    except RarError as e:
+        log.error(f"Error openning rar archive: {e}")
+        return []
 
     nodes: list[unf_types.Node] = []
 
