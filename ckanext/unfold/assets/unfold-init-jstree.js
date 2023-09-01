@@ -15,11 +15,14 @@ ckan.module("unfold-init-jstree", function ($, _) {
             $("#jstree-search-clear").click(this._onClearSearch);
 
             $(this.el).jstree({
-                'core': {
-                    'data': this.options.data
+                core: {
+                    data: this.options.data,
+                    themes: {
+                        dots: false
+                    }
                 },
                 search: {
-                    "show_only_matches": true,
+                    show_only_matches: true,
                 },
                 table: {
                     columns: [
@@ -33,7 +36,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
                     columnWidth: 100
                 },
                 plugins: [
-                    "search", "wholerow", "table", "sort"
+                    "search", "table", "sort"
                 ]
             });
         },

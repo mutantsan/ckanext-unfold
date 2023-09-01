@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import json
 import math
+
+from ckan.lib.redis import connect_to_redis
+
+import ckanext.unfold.types as unf_types
 
 
 def get_icon_by_format(fmt: str) -> str:
@@ -43,3 +48,26 @@ def printable_file_size(size_bytes: int) -> str:
     p = math.pow(1024, i)
     s = round(float(size_bytes) / p, 1)
     return "%s %s" % (s, size_name[i])
+
+
+def save_archive_structure(nodes: list[unf_types.Node], resource_id: str) -> None:
+    """Save an archive structure to redis to"""
+    conn = connect_to_redis()
+    conn.set(f"ckanext:unfold:tree:{resource_id}", json.dumps(nodes))
+    conn.close()
+
+
+def get_archive_structure(resource_id: str) -> None:
+    """Retrieve an archive structure from redis"""
+    conn = connect_to_redis()
+    data = conn.get(f"ckanext:unfold:tree:{resource_id}")
+    conn.close()
+
+    return json.loads(data) if data else None
+
+
+def delete_archive_structure(resource_id: str) -> None:
+    """Delete an archive structure from redis. Called on resource delete/update"""
+    conn = connect_to_redis()
+    conn.delete(f"ckanext:unfold:tree:{resource_id}")
+    conn.close()

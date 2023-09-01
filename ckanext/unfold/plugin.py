@@ -7,6 +7,7 @@ import ckan.plugins.toolkit as tk
 from ckan.types import Context, DataDict
 
 import ckanext.unfold.adapters as unf_adapters
+import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.logic.schema import get_preview_schema
 
 
@@ -14,6 +15,7 @@ from ckanext.unfold.logic.schema import get_preview_schema
 class UnfoldPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IResourceView, inherit=True)
+    plugins.implements(plugins.IResourceController, inherit=True)
 
     # IConfigurer
 
@@ -43,3 +45,24 @@ class UnfoldPlugin(plugins.SingletonPlugin):
 
     def form_template(self, context: Context, data_dict: DataDict) -> str:
         return "unfold_form.html"
+
+    # IResourceController
+
+    def before_resource_update(
+        self, context: Context, current: dict[str, Any], resource: dict[str, Any]
+    ) -> None:
+        if resource["url_type"] == "upload" and not resource["upload"]:
+            return
+
+        if resource["url_type"] == "url" and current["url"] == resource["url"]:
+            return
+
+        unf_utils.delete_archive_structure(resource["id"])
+
+    def before_resource_delete(
+        self,
+        context: Context,
+        resource: dict[str, Any],
+        resources: list[dict[str, Any]],
+    ) -> None:
+        unf_utils.delete_archive_structure(resource["id"])

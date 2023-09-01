@@ -10,6 +10,7 @@ from requests.exceptions import RequestException
 
 import ckanext.unfold.adapters as unf_adapters
 import ckanext.unfold.types as unf_types
+import ckanext.unfold.utils as unf_utils
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +29,13 @@ def get_archive_tree(resource: dict[str, Any]) -> str | None:
             else:
                 data = resp.text
 
-    tree = parse_archive(resource["format"].lower(), filepath)
+    tree = unf_utils.get_archive_structure(resource["id"])
+
+    if not tree:
+        tree = parse_archive(
+            resource["format"].lower(), filepath
+        )
+        unf_utils.save_archive_structure(tree, resource["id"])
 
     return json.dumps(tree) if tree else None
 
