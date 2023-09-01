@@ -1,20 +1,24 @@
 {% set archive_tree = h.get_archive_tree(resource) %}
 
-<div class="ckanext-jstree-search">
-    <div class="jstree-search--input">
-        <label class="d-none" for="field-sitewide-search">{{ _('Search') }}</label>
-        <input id="jstree-search" class="form-control"  type="text" name="jstree-search" placeholder="{{ _('Search') }}" aria-label="{{ _('Search') }}"/>
-        <button class="btn search-icon" type="submit" aria-label="{{ _('Search icon') }}"><i class="fa fa-search"></i></button>
+{% if archive_tree %}
+    <div class="ckanext-jstree-search">
+        <div class="jstree-search--input">
+            <label class="d-none" for="field-sitewide-search">{{ _('Search') }}</label>
+            <input id="jstree-search" class="form-control"  type="text" name="jstree-search" placeholder="{{ _('Search') }}" aria-label="{{ _('Search') }}"/>
+            <button class="btn search-icon" type="submit" aria-label="{{ _('Search icon') }}"><i class="fa fa-search"></i></button>
+        </div>
+
+        <div class="jstree-search--clear">
+            <button class="btn btn-primary" id="jstree-search-clear">
+                <i class="fa fa-close"></i>
+                {{ _("Clear") }}
+            </button>
+        </div>
     </div>
 
-    <div class="jstree-search--clear">
-        <button class="btn btn-primary" id="jstree-search-clear">
-            <i class="fa fa-close"></i>
-            {{ _("Clear") }}
-        </button>
+    <div id="treeDemo" data-module="unfold-init-jstree" data-module-data="{{ archive_tree }}">
+
     </div>
-</div>
-
-<div id="treeDemo" data-module="unfold-init-jstree" data-module-data="{{ archive_tree }}">
-
-</div>
+{% else %}
+    <span>{{ _("Error loading archive. It's either empty or corrupted.") }}</span>
+{% endif %}

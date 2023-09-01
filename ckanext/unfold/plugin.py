@@ -28,7 +28,7 @@ class UnfoldPlugin(plugins.SingletonPlugin):
         return {
             "name": "unfold_view",
             "title": tk._("Unfold"),
-            "icon": "fa-file-lines",
+            "icon": "archive",
             "schema": get_preview_schema(),
             "iframed": False,
             "always_available": True,

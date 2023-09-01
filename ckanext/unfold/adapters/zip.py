@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from zipfile import ZipFile, ZipInfo
+import logging
+from zipfile import ZipFile, ZipInfo, LargeZipFile, BadZipFile
 
 import ckanext.unfold.utils as unf_utils
 import ckanext.unfold.types as unf_types
 
+log = logging.getLogger(__name__)
 
-def build_directory_tree(filepath: str):
-    with ZipFile(filepath) as archive:
-        file_list: list[ZipInfo] = archive.infolist()
+
+def build_directory_tree(filepath: str) -> list[unf_types.Node]:
+    try:
+        with ZipFile(filepath) as archive:
+            file_list: list[ZipInfo] = archive.infolist()
+    except (LargeZipFile, BadZipFile) as e:
+        log.error(f"Error openning zip archive: {e}")
+        return []
 
     nodes: list[unf_types.Node] = []
 

@@ -11,11 +11,12 @@ from typing import Any
 import ckan.lib.uploader as uploader
 
 import ckanext.unfold.adapters as unf_adapters
+import ckanext.unfold.types as unf_types
 
 log = logging.getLogger(__name__)
 
 
-def get_archive_tree(resource: dict[str, Any]) -> Any:
+def get_archive_tree(resource: dict[str, Any]) -> str | None:
     if resource.get("url_type") == "upload":
         upload = uploader.get_resource_uploader(resource)
         filepath = upload.get_path(resource["id"])
@@ -29,10 +30,12 @@ def get_archive_tree(resource: dict[str, Any]) -> Any:
             else:
                 data = resp.text
 
-    return json.dumps(parse_archive(resource["format"].lower(), filepath))
+    tree = parse_archive(resource["format"].lower(), filepath)
+
+    return json.dumps(tree) if tree else None
 
 
-def parse_archive(fmt: str, filepath):
+def parse_archive(fmt: str, filepath) -> list[unf_types.Node]:
     if fmt not in unf_adapters.ADAPTERS:
         raise TypeError(f"No adapter for `{fmt}` archives")
 
