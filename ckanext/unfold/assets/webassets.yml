@@ -3,6 +3,7 @@ unfold-js:
   output: ckanext-unfold/%(version)s-unfold.js
   contents:
     - unfold-init-jstree.js
+    - vendor/jstree.min.js
   extra:
     preload:
       - base/main
@@ -12,16 +13,4 @@ unfold-css:
   output: ckanext-unfold/%(version)s-unfold.css
   contents:
     - css/unfold.css
-
-
-jstree-js:
-  filter: rjsmin
-  output: ckanext-unfold/%(version)s-js-tree.js
-  contents:
-    - vendor/jstree.min.js
-
-jstree-css:
-  filter: cssrewrite
-  output: ckanext-unfold/%(version)s-css-tree.js
-  contents:
     - vendor/jstree.min.css
