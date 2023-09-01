@@ -21,8 +21,17 @@
     }
 }
 
-.jstree-default .jstree-search {
-    background: bisque;
+.jstree-default {
+    .jstree-search {
+        background: bisque;
+    }
+    .jstree-anchor {
+        &[aria-expanded="true"] {
+            .jstree-icon:before {
+                content: "\f07c";
+            }
+        }
+    }
 }
 
 .unfold-preview {
