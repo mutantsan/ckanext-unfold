@@ -6,6 +6,7 @@ Preview for different archive formats
 ### TODO
     * implement remote support for tar, 7z
     * add password support for all adapters
+    * refactor to show an error to user if something went wrong (no pass, request exp, corrupted or empty archive)
 
 
 ## What are the dependencies?
