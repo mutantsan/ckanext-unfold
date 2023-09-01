@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
+from io import BytesIO
 
+import requests
 import py7zr
 from py7zr import FileInfo, exceptions
 
@@ -10,14 +12,23 @@ import ckan.plugins.toolkit as tk
 
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
+import ckanext.unfold.exception as unf_exception
 
 log = logging.getLogger(__name__)
 
 
-def build_directory_tree(filepath: str):
+def build_directory_tree(filepath: str, remote: Optional[bool] = False):
     try:
-        with py7zr.SevenZipFile(filepath) as archive:
-            file_list: list[FileInfo] = archive.list()
+        if remote:
+            file_list = get7zlist_from_url(filepath)
+        else:
+            with py7zr.SevenZipFile(filepath) as archive:
+                if archive.needs_password():
+                    raise unf_exception.UnfoldError(
+                        f"Archive is protected with password"
+                    )
+
+                file_list: list[FileInfo] = archive.list()
     except exceptions.ArchiveError as e:
         log.error(f"Error openning 7z archive: {e}")
         return []
@@ -60,3 +71,11 @@ def _prepare_table_data(entry: FileInfo) -> dict[str, Any]:
         "format": fmt,
         "modified_at": modified_at,
     }
+
+
+def get7zlist_from_url(url) -> list[FileInfo]:
+    """Download an archive and fetch a file list. Rar file doesn't allow us
+    to download it partially and fetch only file list."""
+    resp = requests.get(url)
+
+    return py7zr.SevenZipFile(BytesIO(resp.content)).infolist()

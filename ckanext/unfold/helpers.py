@@ -30,7 +30,7 @@ def get_archive_tree(resource: dict[str, Any]) -> list[unf_types.Node]:
 
     if not tree:
         tree = parse_archive(resource["format"].lower(), filepath, remote)
-        # unf_utils.save_archive_structure(tree, resource["id"])
+        unf_utils.save_archive_structure(tree, resource["id"])
 
     return tree
 

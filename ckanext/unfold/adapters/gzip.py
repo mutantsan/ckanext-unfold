@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, cast, Optional
 
 from ckan import model as model
 
@@ -8,7 +8,7 @@ import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
 
 
-def build_directory_tree(filepath: str):
+def build_directory_tree(filepath: str, remote: Optional[bool] = False):
     resource = _get_resource(filepath)
     return [_build_node(resource)]
 
