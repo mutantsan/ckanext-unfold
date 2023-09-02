@@ -9,6 +9,9 @@ from ckan.lib.redis import connect_to_redis
 import ckanext.unfold.types as unf_types
 
 
+DEFAULT_DATE_FORMAT = "%d/%m/%Y - %H:%M"
+
+
 def get_icon_by_format(fmt: str) -> str:
     default_icon = "fa fa-file"
     icons = {

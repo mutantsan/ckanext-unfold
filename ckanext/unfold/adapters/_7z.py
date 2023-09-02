@@ -61,7 +61,9 @@ def _build_node(entry: FileInfo) -> unf_types.Node:
 def _prepare_table_data(entry: FileInfo) -> dict[str, Any]:
     name = unf_utils.name_from_path(entry.filename)
     fmt = "" if entry.is_directory else unf_utils.get_format_from_name(name)
-    modified_at = tk.h.render_datetime(entry.creationtime, with_hours=True)
+    modified_at = tk.h.render_datetime(
+        entry.creationtime, date_format=unf_utils.DEFAULT_DATE_FORMAT
+    )
 
     return {
         "size": unf_utils.printable_file_size(entry.compressed)
@@ -69,13 +71,13 @@ def _prepare_table_data(entry: FileInfo) -> dict[str, Any]:
         else "--",
         "type": "folder" if entry.is_directory else "file",
         "format": fmt,
-        "modified_at": modified_at,
+        "modified_at": modified_at or "--",
     }
 
 
 def get7zlist_from_url(url) -> list[FileInfo]:
-    """Download an archive and fetch a file list. Rar file doesn't allow us
+    """Download an archive and fetch a file list. 7z file doesn't allow us
     to download it partially and fetch only file list."""
     resp = requests.get(url)
 
-    return py7zr.SevenZipFile(BytesIO(resp.content)).infolist()
+    return py7zr.SevenZipFile(BytesIO(resp.content)).list()

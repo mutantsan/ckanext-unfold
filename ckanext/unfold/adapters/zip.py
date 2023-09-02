@@ -59,7 +59,7 @@ def _prepare_table_data(entry: ZipInfo) -> dict[str, Any]:
     name = unf_utils.name_from_path(entry.filename)
     fmt = "" if entry.is_dir() else unf_utils.get_format_from_name(name)
     modified_at = tk.h.render_datetime(
-        dt(*entry.date_time), date_format="%d/%m/%Y - %H:%M"
+        dt(*entry.date_time), date_format=unf_utils.DEFAULT_DATE_FORMAT
     )
 
     return {
@@ -68,7 +68,7 @@ def _prepare_table_data(entry: ZipInfo) -> dict[str, Any]:
         else "",
         "type": "folder" if entry.is_dir() else "file",
         "format": fmt,
-        "modified_at": modified_at,
+        "modified_at": modified_at or "--",
     }
 
 

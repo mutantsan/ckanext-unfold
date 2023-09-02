@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from io import BytesIO
 from typing import Any, Optional
+from datetime import datetime as dt
 
 import rarfile
 import requests
@@ -63,7 +64,6 @@ def _build_node(entry: RarInfo) -> unf_types.Node:
 def _prepare_table_data(entry: RarInfo) -> dict[str, Any]:
     name = unf_utils.name_from_path(entry.filename)
     fmt = "" if entry.isdir() else unf_utils.get_format_from_name(name)
-    modified_at = tk.h.render_datetime(entry.mtime, with_hours=True)
 
     return {
         "size": unf_utils.printable_file_size(entry.compress_size)
@@ -71,8 +71,21 @@ def _prepare_table_data(entry: RarInfo) -> dict[str, Any]:
         else "--",
         "type": "folder" if entry.isdir() else "file",
         "format": fmt,
-        "modified_at": modified_at,
+        "modified_at": _fetch_mtime(entry),
     }
+
+
+def _fetch_mtime(entry: RarInfo) -> str:
+    modified_at = tk.h.render_datetime(
+        entry.mtime, date_format=unf_utils.DEFAULT_DATE_FORMAT
+    )
+
+    if not modified_at and isinstance(entry.date_time, tuple):
+        modified_at = tk.h.render_datetime(
+            dt(*entry.date_time), date_format=unf_utils.DEFAULT_DATE_FORMAT
+        )
+
+    return modified_at or "--"
 
 
 def get_rarlist_from_url(url) -> list[RarInfo]:

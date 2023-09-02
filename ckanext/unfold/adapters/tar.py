@@ -58,13 +58,15 @@ def _build_node(entry: TarInfo) -> unf_types.Node:
 def _prepare_table_data(entry: TarInfo) -> dict[str, Any]:
     name = unf_utils.name_from_path(entry.name)
     fmt = "" if entry.isdir() else unf_utils.get_format_from_name(name)
-    modified_at = tk.h.render_datetime(dt.fromtimestamp(entry.mtime), with_hours=True)
+    modified_at = tk.h.render_datetime(
+        dt.fromtimestamp(entry.mtime), date_format=unf_utils.DEFAULT_DATE_FORMAT
+    )
 
     return {
         "size": unf_utils.printable_file_size(entry.size) if entry.size else "",
         "type": "folder" if entry.isdir() else "file",
         "format": fmt,
-        "modified_at": modified_at,
+        "modified_at": modified_at or "--",
     }
 
 
