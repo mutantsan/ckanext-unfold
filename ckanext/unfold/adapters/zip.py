@@ -10,6 +10,7 @@ import requests
 
 import ckan.plugins.toolkit as tk
 
+import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
 
@@ -24,13 +25,15 @@ def build_directory_tree(
             file_list = get_ziplist_from_url(filepath)
         else:
             with ZipFile(filepath) as archive:
+                # zip format do not support encrypted filenames so we don't have
+                # to check for pass protection, we have enough information from
+                # `infolist` method
+
                 file_list: list[ZipInfo] = archive.infolist()
     except (LargeZipFile, BadZipFile) as e:
-        log.error(f"Error openning archive: {e}")
-        return []
+        raise unf_exception.UnfoldError(f"Error openning archive: {e}")
     except requests.RequestException as e:
-        log.error(f"Error fetching remote archive: {e}")
-        return []
+        raise unf_exception.UnfoldError(f"Error fetching remote archive: {e}")
 
     nodes: list[unf_types.Node] = []
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, cast, Optional
+from typing import Any, Optional, cast
 
 from ckan import model as model
 

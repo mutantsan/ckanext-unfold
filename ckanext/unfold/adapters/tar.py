@@ -11,6 +11,7 @@ import requests
 
 import ckan.plugins.toolkit as tk
 
+import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
 
@@ -27,10 +28,14 @@ def build_directory_tree(
             file_list = get_tarlist_from_url(filepath)
         else:
             with tarfile.open(filepath, mode) as archive:
+                # TODO: tarfile library doesn't have built-in support
+                # for checking whether a TAR file is protected with a password
+                # investigate it if someone will have such a problem lately
                 file_list: list[TarInfo] = archive.getmembers()
     except TarError as e:
-        log.error(f"Error openning rar archive: {e}")
-        return []
+        raise unf_exception.UnfoldError(f"Error openning archive: {e}")
+    except requests.RequestException as e:
+        raise unf_exception.UnfoldError(f"Error fetching remote archive: {e}")
 
     nodes: list[unf_types.Node] = []
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime as dt
 from io import BytesIO
 from typing import Any, Optional
-from datetime import datetime as dt
 
 import rarfile
 import requests
@@ -29,7 +29,7 @@ def build_directory_tree(
             with rarfile.RarFile(filepath) as archive:
                 if archive.needs_password():
                     raise unf_exception.UnfoldError(
-                        f"Archive is protected with password"
+                        "Archive is protected with password"
                     )
 
                 file_list: list[RarInfo] = archive.infolist()
@@ -82,7 +82,8 @@ def _fetch_mtime(entry: RarInfo) -> str:
 
     if not modified_at and isinstance(entry.date_time, tuple):
         modified_at = tk.h.render_datetime(
-            dt(*entry.date_time), date_format=unf_utils.DEFAULT_DATE_FORMAT
+            dt(*entry.date_time),  # type: ignore
+            date_format=unf_utils.DEFAULT_DATE_FORMAT,
         )
 
     return modified_at or "--"
@@ -93,4 +94,9 @@ def get_rarlist_from_url(url) -> list[RarInfo]:
     to download it partially and fetch only file list."""
     resp = requests.get(url)
 
-    return rarfile.RarFile(BytesIO(resp.content)).infolist()
+    archive = rarfile.RarFile(BytesIO(resp.content))
+
+    if archive.needs_password():
+        raise unf_exception.UnfoldError("Archive is protected with password")
+
+    return archive.infolist()

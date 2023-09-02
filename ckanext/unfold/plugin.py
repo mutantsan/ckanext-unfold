@@ -11,9 +11,7 @@ import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.logic.schema import get_preview_schema
 
 
-@tk.blanket.helpers
 @tk.blanket.actions
-# @tk.blanket.blueprints
 class UnfoldPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IResourceView, inherit=True)

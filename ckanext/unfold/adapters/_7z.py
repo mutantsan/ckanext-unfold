@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
 from io import BytesIO
+from typing import Any, Optional
 
-import requests
 import py7zr
+import requests
 from py7zr import FileInfo, exceptions
 
 import ckan.plugins.toolkit as tk
 
+import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
-import ckanext.unfold.exception as unf_exception
 
 log = logging.getLogger(__name__)
 
@@ -25,13 +25,14 @@ def build_directory_tree(filepath: str, remote: Optional[bool] = False):
             with py7zr.SevenZipFile(filepath) as archive:
                 if archive.needs_password():
                     raise unf_exception.UnfoldError(
-                        f"Archive is protected with password"
+                        "Archive is protected with password"
                     )
 
                 file_list: list[FileInfo] = archive.list()
     except exceptions.ArchiveError as e:
-        log.error(f"Error openning 7z archive: {e}")
-        return []
+        raise unf_exception.UnfoldError(f"Error openning archive: {e}")
+    except requests.RequestException as e:
+        raise unf_exception.UnfoldError(f"Error fetching remote archive: {e}")
 
     nodes: list[unf_types.Node] = []
 
@@ -79,5 +80,10 @@ def get7zlist_from_url(url) -> list[FileInfo]:
     """Download an archive and fetch a file list. 7z file doesn't allow us
     to download it partially and fetch only file list."""
     resp = requests.get(url)
+
+    archive = py7zr.SevenZipFile(BytesIO(resp.content))
+
+    if archive.needs_password():
+        raise unf_exception.UnfoldError("Archive is protected with password")
 
     return py7zr.SevenZipFile(BytesIO(resp.content)).list()
