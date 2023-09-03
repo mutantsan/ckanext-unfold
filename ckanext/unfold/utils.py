@@ -25,7 +25,20 @@ def get_icon_by_format(fmt: str) -> str:
         ("xls", "xlsx"): "fa fa-file-excel",
         ("doc", "docx"): "fa fa-file-word",
         ("ppt", "pptx", "pptm"): "fa fa-file-powerpoint",
-        ("png", "jpeg", "jpg", "svg", "bmp", "psd"): "fa fa-file-image",
+        (
+            "ai",
+            "gif",
+            "ico",
+            "tif",
+            "tiff",
+            "webp",
+            "png",
+            "jpeg",
+            "jpg",
+            "svg",
+            "bmp",
+            "psd",
+        ): "fa fa-file-image",
         (
             "7z",
             "rar",
@@ -54,6 +67,8 @@ def get_icon_by_format(fmt: str) -> str:
         ): "fa fa-file-code",
         ("xml", "dtd"): "fa fa-file-contract",
         ("mp3", "wav", "wma", "aac", "flac", "mpa", "ogg"): "fa fa-file-audio",
+        ("fnt", "fon", "otf", "ttf"): "fa fa-font",
+        ("pub", "pem"): "fa fa-file-shield"
     }
 
     for formats, icon in icons.items():
