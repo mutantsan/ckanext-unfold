@@ -36,7 +36,7 @@ These packages are automatically installed when installing with pip command.
 For extra information, please visit the [official documentation](https://py7zr.readthedocs.io/en/latest/user_guide.html#dependencies),
 especially the dependencies section.
 
-### ZIP, ZIPX
+### ZIP, ZIPX, JAR
 
 We are using built-in library [`zipfile`](https://docs.python.org/3/library/zipfile.html). Please consider referring to the official documentation for more information.
 
