@@ -13,6 +13,7 @@ import ckanext.unfold.adapters as unf_adapters
 import ckanext.unfold.types as unf_types
 
 DEFAULT_DATE_FORMAT = "%d/%m/%Y - %H:%M"
+DEFAULT_TIMEOUT = 60  # seconds
 log = logging.getLogger(__name__)
 
 
@@ -100,7 +101,8 @@ def save_archive_structure(nodes: list[unf_types.Node], resource_id: str) -> Non
     """Save an archive structure to redis to"""
     conn = connect_to_redis()
     conn.set(
-        f"ckanext:unfold:tree:{resource_id}", json.dumps([n.model_dump() for n in nodes])
+        f"ckanext:unfold:tree:{resource_id}",
+        json.dumps([n.model_dump() for n in nodes]),
     )
     conn.close()
 
@@ -121,7 +123,9 @@ def delete_archive_structure(resource_id: str) -> None:
     conn.close()
 
 
-def get_archive_tree(resource: dict[str, Any]) -> list[unf_types.Node] | list[dict[str, Any]]:
+def get_archive_tree(
+    resource: dict[str, Any]
+) -> list[unf_types.Node] | list[dict[str, Any]]:
     remote = False
 
     if resource.get("url_type") == "upload":

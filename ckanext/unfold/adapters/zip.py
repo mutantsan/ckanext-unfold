@@ -97,6 +97,7 @@ def _get_remote_zip_infolist(url: str, start, end) -> list[ZipInfo]:
         headers={
             "Range": "bytes={}-{}".format(start, end),
         },
+        timeout=unf_utils.DEFAULT_TIMEOUT,
     )
 
     return ZipFile(BytesIO(resp.content)).infolist()

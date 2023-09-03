@@ -66,7 +66,7 @@ def get_rpmlist_from_url(url) -> list[RPMInfo]:
     """Download an archive and fetch a file list. Tar file doesn't allow us
     to download it partially and fetch only file list, because the information
     about each file is stored at the beggining of the file"""
-    resp = requests.get(url)
+    resp = requests.get(url, timeout=unf_utils.DEFAULT_TIMEOUT)
 
     return RPMFile(fileobj=BytesIO(resp.content)).getmembers()
 

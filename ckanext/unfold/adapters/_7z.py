@@ -25,7 +25,7 @@ def build_directory_tree(filepath: str, remote: Optional[bool] = False):
             with py7zr.SevenZipFile(filepath) as archive:
                 if archive.needs_password():
                     raise unf_exception.UnfoldError(
-                        "Archive is protected with password"
+                        "Error. Archive is protected with password"
                     )
 
                 file_list: list[FileInfo] = archive.list()
@@ -79,11 +79,11 @@ def _prepare_table_data(entry: FileInfo) -> dict[str, Any]:
 def get7zlist_from_url(url) -> list[FileInfo]:
     """Download an archive and fetch a file list. 7z file doesn't allow us
     to download it partially and fetch only file list."""
-    resp = requests.get(url)
+    resp = requests.get(url, timeout=unf_utils.DEFAULT_TIMEOUT)
 
     archive = py7zr.SevenZipFile(BytesIO(resp.content))
 
     if archive.needs_password():
-        raise unf_exception.UnfoldError("Archive is protected with password")
+        raise unf_exception.UnfoldError("Error. Archive is protected with password")
 
     return py7zr.SevenZipFile(BytesIO(resp.content)).list()

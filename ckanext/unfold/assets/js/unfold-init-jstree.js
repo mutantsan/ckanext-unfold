@@ -18,8 +18,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
             $.ajax({
                 url: this.sandbox.url("/api/action/get_archive_structure"),
                 data: { "id": this.options.resourceId },
-                success: this._onSuccessRequest,
-                error: function (xhr, status, error) {}
+                success: this._onSuccessRequest
             });
         },
 
@@ -31,19 +30,6 @@ ckan.module("unfold-init-jstree", function ($, _) {
             $("#jstree-search").val("").trigger("change");
         },
 
-        _preparePayload: function () {
-            return { "id": this.options.resourceId };
-        },
-
-        _onErrorRequest: function (xhr, status, error) {
-            let errMsg = xhr.responseJSON.error;
-
-            $(this.el).jstree(true).settings.plugins = [];
-            $(this.el).jstree(true).destroy();
-
-            $("#archive-tree-error").text("Error: " + errMsg)
-        },
-
         _onSuccessRequest: function (data) {
             if (data.result.error) {
                 this._displayErrorReason(data.result.error);
@@ -53,7 +39,9 @@ ckan.module("unfold-init-jstree", function ($, _) {
         },
 
         _displayErrorReason: function (error) {
-            $("#archive-tree-error").text("Error: " + error);
+            $(".archive-tree--spinner").remove();
+            $("#archive-tree-error span").text(error);
+            $("#archive-tree-error").toggle();
         },
 
         _initJsTree: function (data) {

@@ -29,7 +29,7 @@ def build_directory_tree(
             with rarfile.RarFile(filepath) as archive:
                 if archive.needs_password():
                     raise unf_exception.UnfoldError(
-                        "Archive is protected with password"
+                        "Error. Archive is protected with password"
                     )
 
                 file_list: list[RarInfo] = archive.infolist()
@@ -92,11 +92,11 @@ def _fetch_mtime(entry: RarInfo) -> str:
 def get_rarlist_from_url(url) -> list[RarInfo]:
     """Download an archive and fetch a file list. Rar file doesn't allow us
     to download it partially and fetch only file list."""
-    resp = requests.get(url)
+    resp = requests.get(url, timeout=unf_utils.DEFAULT_TIMEOUT)
 
     archive = rarfile.RarFile(BytesIO(resp.content))
 
     if archive.needs_password():
-        raise unf_exception.UnfoldError("Archive is protected with password")
+        raise unf_exception.UnfoldError("Error. Archive is protected with password")
 
     return archive.infolist()
