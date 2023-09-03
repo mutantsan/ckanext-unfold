@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional, Dict
+
+from pydantic import BaseModel, Field
 
 
-class Node(TypedDict, total=False):
+class Node(BaseModel):
     id: str
     text: str
     icon: str
-    state: dict[str, bool]
     parent: str
-    data: Optional[dict[str, Any]]
+    state: Optional[Dict[str, bool]] = Field(default={"opened": True})
+    data: Optional[Dict[str, Any]] = Field(default_factory=dict)

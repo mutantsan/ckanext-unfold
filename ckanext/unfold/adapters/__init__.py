@@ -1,6 +1,6 @@
 from functools import partial
 
-from . import _7z, gzip, rar, tar, zip
+from . import _7z, gzip, rar, rpm, tar, zip
 
 ADAPTERS = {
     "rar": rar.build_directory_tree,
@@ -15,4 +15,5 @@ ADAPTERS = {
     "tar.gz": partial(tar.build_directory_tree, compression="gz"),
     "tar.xz": partial(tar.build_directory_tree, compression="xz"),
     "tar.bz2": partial(tar.build_directory_tree, compression="bz2"),
+    "rpm": rpm.build_directory_tree,
 }

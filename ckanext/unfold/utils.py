@@ -11,7 +11,6 @@ from ckan.lib.redis import connect_to_redis
 
 import ckanext.unfold.adapters as unf_adapters
 import ckanext.unfold.types as unf_types
-import ckanext.unfold.utils as unf_utils
 
 DEFAULT_DATE_FORMAT = "%d/%m/%Y - %H:%M"
 log = logging.getLogger(__name__)
@@ -68,7 +67,7 @@ def get_icon_by_format(fmt: str) -> str:
         ("xml", "dtd"): "fa fa-file-contract",
         ("mp3", "wav", "wma", "aac", "flac", "mpa", "ogg"): "fa fa-file-audio",
         ("fnt", "fon", "otf", "ttf"): "fa fa-font",
-        ("pub", "pem"): "fa fa-file-shield"
+        ("pub", "pem"): "fa fa-file-shield",
     }
 
     for formats, icon in icons.items():
@@ -84,8 +83,7 @@ def name_from_path(path: str | None) -> str:
 
 
 def get_format_from_name(name: str) -> str:
-    suffixes = pathlib.Path(name).suffixes
-    return "".join(suffixes).strip(".")
+    return pathlib.Path(name).suffix
 
 
 def printable_file_size(size_bytes: int) -> str:
@@ -101,11 +99,13 @@ def printable_file_size(size_bytes: int) -> str:
 def save_archive_structure(nodes: list[unf_types.Node], resource_id: str) -> None:
     """Save an archive structure to redis to"""
     conn = connect_to_redis()
-    conn.set(f"ckanext:unfold:tree:{resource_id}", json.dumps(nodes))
+    conn.set(
+        f"ckanext:unfold:tree:{resource_id}", json.dumps([n.model_dump() for n in nodes])
+    )
     conn.close()
 
 
-def get_archive_structure(resource_id: str) -> None:
+def get_archive_structure(resource_id: str) -> list[dict[str, Any]] | None:
     """Retrieve an archive structure from redis"""
     conn = connect_to_redis()
     data = conn.get(f"ckanext:unfold:tree:{resource_id}")
@@ -121,7 +121,7 @@ def delete_archive_structure(resource_id: str) -> None:
     conn.close()
 
 
-def get_archive_tree(resource: dict[str, Any]) -> list[unf_types.Node]:
+def get_archive_tree(resource: dict[str, Any]) -> list[unf_types.Node] | list[dict[str, Any]]:
     remote = False
 
     if resource.get("url_type") == "upload":
@@ -134,11 +134,11 @@ def get_archive_tree(resource: dict[str, Any]) -> list[unf_types.Node]:
         filepath = resource["url"]
         remote = True
 
-    tree = unf_utils.get_archive_structure(resource["id"])
+    tree = get_archive_structure(resource["id"])
 
     if not tree:
         tree = parse_archive(resource["format"].lower(), filepath, remote)
-        unf_utils.save_archive_structure(tree, resource["id"])
+        save_archive_structure(tree, resource["id"])
 
     return tree
 

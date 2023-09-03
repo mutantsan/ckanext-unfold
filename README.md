@@ -44,6 +44,12 @@ We are using built-in library [`zipfile`](https://docs.python.org/3/library/zipf
 
 We are using built-in library [`tarfile`](https://docs.python.org/3/library/tarfile.html). Please consider referring to the official documentation for more information.
 
+### RPM
+
+We are using [`rpmfile`](https://github.com/srossross/rpmfile) library.
+
+If you want to use rpmfile with zstd compressed rpms, you'll need to install the [`zstandard`](https://pypi.org/project/zstandard/) module.
+
 ## Config settings
 
 TODO
