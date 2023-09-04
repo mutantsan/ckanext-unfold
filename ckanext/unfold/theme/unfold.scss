@@ -1,3 +1,5 @@
+$image-path: "../../images";
+
 .ckanext-jstree-search {
     margin-bottom: 12px;
     display: flex;
@@ -22,9 +24,50 @@
 }
 
 .jstree-default {
+    &>.jstree-no-dots {
+
+        .jstree-open,
+        .jstree-closed {
+            .jstree-ocl {
+                background-image: unset;
+                font-style: inherit;
+
+                &:before {
+                    font-family: var(--fa-style-family, "Font Awesome 6 Free");
+                    font-weight: var(--fa-style, 900);
+                }
+            }
+        }
+
+        .jstree-open {
+            .jstree-ocl {
+                background-image: unset;
+
+                &:before {
+                    content: "\f078";
+                }
+            }
+        }
+
+        .jstree-closed {
+            .jstree-ocl {
+                &:before {
+                    content: "\f054";
+                }
+            }
+        }
+
+        .jstree-leaf > .jstree-ocl {
+            &:before {
+                display: none;
+            }
+        }
+    }
+
     .jstree-search {
         background: bisque;
     }
+
     .jstree-anchor {
         &[aria-expanded="true"] {
             .jstree-icon:before {
@@ -41,6 +84,7 @@
 }
 
 .jstree-table-wrapper {
+
     .jstree-table-headerwrapper,
     .jstree-table-midwrapper {
         width: -webkit-fill-available;
