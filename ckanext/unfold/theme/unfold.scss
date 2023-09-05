@@ -88,6 +88,7 @@ $image-path: "../../images";
     .jstree-table-headerwrapper,
     .jstree-table-midwrapper {
         width: -webkit-fill-available;
+        width: -moz-available;
         display: table;
     }
 }
