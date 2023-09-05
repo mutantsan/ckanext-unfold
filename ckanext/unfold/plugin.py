@@ -51,10 +51,10 @@ class UnfoldPlugin(plugins.SingletonPlugin):
     def before_resource_update(
         self, context: Context, current: dict[str, Any], resource: dict[str, Any]
     ) -> None:
-        if resource["url_type"] == "upload" and not resource["upload"]:
+        if resource.get("url_type") == "upload" and not resource.get("upload"):
             return
 
-        if resource["url_type"] == "url" and current["url"] == resource["url"]:
+        if resource.get("url_type") == "url" and current["url"] == resource["url"]:
             return
 
         unf_utils.delete_archive_structure(resource["id"])
