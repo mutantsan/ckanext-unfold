@@ -4,6 +4,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
         options: {
             data: null,
             resourceId: null,
+            resourceViewId: null
         },
 
         initialize: function () {
@@ -17,7 +18,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
 
             $.ajax({
                 url: this.sandbox.url("/api/action/get_archive_structure"),
-                data: { "id": this.options.resourceId },
+                data: { "id": this.options.resourceId, "view_id": this.options.resourceViewId },
                 success: this._onSuccessRequest
             });
         },

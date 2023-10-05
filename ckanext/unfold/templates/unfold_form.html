@@ -1,10 +1,5 @@
 {% import 'macros/form.html' as form %}
 
-{{ form.input(
-    'file_url',
-    id='field-file_url',
-    label=_('File URL'),
-    placeholder=_('eg. http://example.com/test.zip  (if blank uses resource url)'),
-    value=data.file_url,
-    error=errors.file_url)
-}}
+{{ form.input('file_url', label=_('File URL'), placeholder=_('eg. http://example.com/test.zip  (if blank uses resource url)'), value=data.file_url, error=errors.file_url)}}
+
+{{ form.input('archive_pass', label=_("Password"), id='field-password', type="password", value=data.archive_pass, error=errors.archive_pass) }}

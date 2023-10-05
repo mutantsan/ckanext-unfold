@@ -20,23 +20,30 @@ log = logging.getLogger(__name__)
 
 
 def build_directory_tree(
-    filepath: str, remote: Optional[bool] = False
+    filepath: str, resource_view: dict[str, Any], remote: Optional[bool] = False
 ) -> list[unf_types.Node]:
     try:
         if remote:
             file_list = get_rarlist_from_url(filepath)
         else:
             with rarfile.RarFile(filepath) as archive:
-                if archive.needs_password():
+                if archive.needs_password() and not resource_view.get("archive_pass"):
                     raise unf_exception.UnfoldError(
                         "Error. Archive is protected with password"
                     )
+                elif archive.needs_password():
+                    archive.setpassword(resource_view["archive_pass"])
 
                 file_list: list[RarInfo] = archive.infolist()
     except RarError as e:
         raise unf_exception.UnfoldError(f"Error openning archive: {e}")
     except requests.RequestException as e:
         raise unf_exception.UnfoldError(f"Error fetching remote archive: {e}")
+
+    if not file_list:
+        raise unf_exception.UnfoldError(
+            "Error. The archive is either empty or the password is incorrect."
+        )
 
     nodes: list[unf_types.Node] = []
 

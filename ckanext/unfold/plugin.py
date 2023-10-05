@@ -12,6 +12,7 @@ from ckanext.unfold.logic.schema import get_preview_schema
 
 
 @tk.blanket.actions
+@tk.blanket.validators
 class UnfoldPlugin(plugins.SingletonPlugin):
     plugins.implements(plugins.IConfigurer)
     plugins.implements(plugins.IResourceView, inherit=True)

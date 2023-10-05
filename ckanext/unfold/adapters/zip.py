@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 
 
 def build_directory_tree(
-    filepath: str, remote: Optional[bool] = False
+    filepath: str, resource_view: dict[str, Any], remote: Optional[bool] = False
 ) -> list[unf_types.Node]:
     try:
         if remote:

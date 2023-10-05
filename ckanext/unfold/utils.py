@@ -4,7 +4,7 @@ import json
 import logging
 import math
 import pathlib
-from typing import Any, Optional
+from typing import Any
 
 import ckan.lib.uploader as uploader
 from ckan.lib.redis import connect_to_redis
@@ -124,7 +124,7 @@ def delete_archive_structure(resource_id: str) -> None:
 
 
 def get_archive_tree(
-    resource: dict[str, Any]
+    resource: dict[str, Any], resource_view: dict[str, Any]
 ) -> list[unf_types.Node] | list[dict[str, Any]]:
     remote = False
 
@@ -141,16 +141,13 @@ def get_archive_tree(
     tree = get_archive_structure(resource["id"])
 
     if not tree:
-        tree = parse_archive(resource["format"].lower(), filepath, remote)
+        res_format = resource["format"].lower()
+
+        if res_format not in unf_adapters.ADAPTERS:
+            raise TypeError(f"No adapter for `{res_format}` archives")
+
+        tree = unf_adapters.ADAPTERS[res_format](filepath, resource_view, remote=remote)
+
         save_archive_structure(tree, resource["id"])
 
     return tree
-
-
-def parse_archive(
-    fmt: str, filepath: str, remote: Optional[bool] = False
-) -> list[unf_types.Node]:
-    if fmt not in unf_adapters.ADAPTERS:
-        raise TypeError(f"No adapter for `{fmt}` archives")
-
-    return unf_adapters.ADAPTERS[fmt](filepath, remote=remote)

@@ -19,7 +19,10 @@ log = logging.getLogger(__name__)
 
 
 def build_directory_tree(
-    filepath: str, remote: Optional[bool] = False, compression: Optional[str] = None
+    filepath: str,
+    resource_view: dict[str, Any],
+    remote: Optional[bool] = False,
+    compression: Optional[str] = None,
 ):
     mode = "r" if not compression else f"r:{compression}"
 

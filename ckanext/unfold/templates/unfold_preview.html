@@ -16,7 +16,7 @@
         </div>
     </div>
 
-    <div id="archive-tree" data-module="unfold-init-jstree" data-module-resource-id="{{ resource.id }}">
+    <div id="archive-tree" data-module="unfold-init-jstree" data-module-resource-id="{{ resource.id }}" data-module-resource-view-id="{{ resource_view.id }}" >
         <div class="archive-tree--spinner">
             <img src="{{ h.url_for_static('/spinner.gif') }}" width="20">
             {{ _("The archive tree is currently being initialized. Please wait...") }}

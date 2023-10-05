@@ -17,7 +17,9 @@ import ckanext.unfold.utils as unf_utils
 log = logging.getLogger(__name__)
 
 
-def build_directory_tree(filepath: str, remote: Optional[bool] = False):
+def build_directory_tree(
+    filepath: str, resource_view: dict[str, Any], remote: Optional[bool] = False
+):
     try:
         if remote:
             file_list = get7zlist_from_url(filepath)

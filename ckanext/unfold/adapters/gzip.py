@@ -8,7 +8,9 @@ import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
 
 
-def build_directory_tree(filepath: str, remote: Optional[bool] = False):
+def build_directory_tree(
+    filepath: str, resource_view: dict[str, Any], remote: Optional[bool] = False
+):
     resource = _get_resource(filepath)
     return [_build_node(resource)]
 
