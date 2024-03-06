@@ -58,10 +58,10 @@ ckan.module("unfold-init-jstree", function ($, _) {
                     columnWidth: "200px",
                     columns: [
                         { width: 400, header: "Name" },
-                        { width: 100, header: "Size", value: "size", cellClass: "js-tree-col", headerClass: "js-tree-col", wideCellClass: "js-tree-col" },
-                        { width: 100, header: "Type", value: "type", cellClass: "js-tree-col", headerClass: "js-tree-col", wideCellClass: "js-tree-col" },
-                        { width: 100, header: "Format", value: "format", cellClass: "js-tree-col", headerClass: "js-tree-col", wideCellClass: "js-tree-col" },
-                        { width: 200, header: "Modified at", value: "modified_at", cellClass: "js-tree-col", headerClass: "js-tree-col", wideCellClass: "js-tree-col" }
+                        { width: 100, header: "Size", value: "size", cellClass: "js-tree-col", wideCellClass: "js-tree-col" },
+                        { width: 100, header: "Type", value: "type", cellClass: "js-tree-col", wideCellClass: "js-tree-col" },
+                        { width: 100, header: "Format", value: "format", cellClass: "js-tree-col", wideCellClass: "js-tree-col" },
+                        { width: 200, header: "Modified at", value: "modified_at", cellClass: "js-tree-col", wideCellClass: "js-tree-col" }
                     ],
                     height: 700,
                 },
