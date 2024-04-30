@@ -9,6 +9,7 @@ from typing import Any
 import ckan.lib.uploader as uploader
 from ckan.lib.redis import connect_to_redis
 
+import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.adapters as unf_adapters
 import ckanext.unfold.types as unf_types
 
@@ -113,7 +114,7 @@ def get_archive_structure(resource_id: str) -> list[dict[str, Any]] | None:
     data = conn.get(f"ckanext:unfold:tree:{resource_id}")
     conn.close()
 
-    return json.loads(data) if data else None
+    return json.loads(data) if data else None  # type: ignore
 
 
 def delete_archive_structure(resource_id: str) -> None:
@@ -144,7 +145,7 @@ def get_archive_tree(
         res_format = resource["format"].lower()
 
         if res_format not in unf_adapters.ADAPTERS:
-            raise TypeError(f"No adapter for `{res_format}` archives")
+            raise unf_exception.UnfoldError(f"No adapter for `{res_format}` archives")
 
         tree = unf_adapters.ADAPTERS[res_format](filepath, resource_view, remote=remote)
 
