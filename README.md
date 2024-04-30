@@ -2,11 +2,7 @@
 
 # ckanext-unfold
 
-Preview for different archive formats
-### TODO
- - ~~implement remote support for tar, 7z~~
- - ~~add password support for all adapters~~
- - ~~refactor to show an error to user if something went wrong (no pass, request exp, corrupted or empty archive)~~
+Enhance your CKAN experience with our extension that enables seamless previews of various archive formats, ensuring easy access and efficient data management.
 
 
 ## What are the dependencies?
@@ -49,10 +45,6 @@ We are using built-in library [`tarfile`](https://docs.python.org/3/library/tarf
 We are using [`rpmfile`](https://github.com/srossross/rpmfile) library.
 
 If you want to use rpmfile with zstd compressed rpms, you'll need to install the [`zstandard`](https://pypi.org/project/zstandard/) module.
-
-## Config settings
-
-TODO
 
 ## License
 
