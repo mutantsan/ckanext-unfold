@@ -4,6 +4,16 @@
 
 Enhance your CKAN experience with our extension that enables seamless previews of various archive formats, ensuring easy access and efficient data management.
 
+## Supported Versions
+
+CKAN >= 2.10
+
+## Configuration
+
+```ini
+ckan.plugins = unfold
+ckan.views.default_views = unfold_view
+```
 
 ## What are the dependencies?
 
