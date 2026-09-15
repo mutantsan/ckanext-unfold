@@ -4,6 +4,7 @@ import logging
 import os
 from typing import Any
 
+import ckan.plugins.toolkit as tk
 from ckan.lib import uploader
 
 try:
@@ -19,6 +20,13 @@ import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
 from ckanext.unfold.adapters import remote
 from ckanext.unfold.adapters.remote import DEFAULT_TIMEOUT
+from ckanext.unfold.formatting import (
+    DEFAULT_DATE_FORMAT,
+    file_icon,
+    get_format_from_name,
+    name_from_path,
+    printable_file_size,
+)
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +40,13 @@ class BaseAdapter:
     #: limit applies to the bytes actually transferred instead, so archives
     #: far larger than the limit remain previewable.
     partial_read: bool = False
+
+    #: Exception types the underlying archive library raises while opening
+    #: or parsing a damaged file; ``get_node_list`` turns any of these into
+    #: a plain "Error opening archive: ..." message. An adapter that needs a
+    #: different message for some errors (a password prompt, a distinct
+    #: fetch failure) overrides ``get_node_list`` instead of using this.
+    open_errors: tuple[type[Exception], ...] = ()
 
     def __init__(
         self,
@@ -201,6 +216,79 @@ class BaseAdapter:
         """Parse a Content-Length header value into an int."""
         return remote.content_length(content_length)
 
-    def get_node_list(self) -> list[unf_types.Node]:
-        """Return list of nodes representing the file structure."""
+    def iter_entries(self) -> list[unf_types.Entry]:
+        """Return this archive's entries. Implemented by every adapter.
+
+        Each entry is a small, library-agnostic record (see ``types.Entry``);
+        ``get_node_list`` turns them into ``Node`` objects.
+        """
         raise NotImplementedError
+
+    def get_node_list(self) -> list[unf_types.Node]:
+        """Return list of nodes representing the file structure.
+
+        The default implementation calls ``iter_entries`` and translates any
+        exception listed in ``open_errors`` into a generic message. An
+        adapter whose library raises more than one kind of error (a password
+        prompt vs. a corrupt file, say) overrides this instead.
+        """
+        try:
+            entries = self.iter_entries()
+        except self.open_errors as e:
+            raise unf_exception.UnfoldError(f"Error opening archive: {e}") from e
+
+        return self.build_nodes(entries)
+
+    def build_nodes(self, entries: list[unf_types.Entry]) -> list[unf_types.Node]:
+        """Turn entries into nodes, synthesizing any missing ancestor folders."""
+        return [self._build_node(e) for e in self._ensure_dir_entries(entries)]
+
+    @staticmethod
+    def _ensure_dir_entries(entries: list[unf_types.Entry]) -> list[unf_types.Entry]:
+        """Synthesize directory entries missing from the entry list.
+
+        Archives may list only file paths ("dir/file.txt") without an entry
+        for "dir" itself (common for tar, 7z, rar, ar and always true for
+        rpm's cpio payload). jstree and the folder index both need a real
+        node for every ancestor, so every missing path segment is added here
+        as a directory entry with no size or date.
+        """
+        names = {e.path.rstrip("/") for e in entries}
+        inferred: dict[str, unf_types.Entry] = {}
+
+        for entry in entries:
+            s = entry.path.rstrip("/")
+            i = s.rfind("/")
+
+            while i != -1:
+                d = s[:i]
+
+                if d and d not in names and d not in inferred:
+                    inferred[d] = unf_types.Entry(path=d, is_dir=True)
+
+                i = s.rfind("/", 0, i)
+
+        return [*entries, *inferred.values()]
+
+    def _build_node(self, entry: unf_types.Entry) -> unf_types.Node:
+        path = entry.path.rstrip("/")
+        parts = [p for p in path.split("/") if p]
+        name = name_from_path(path)
+        fmt = "folder" if entry.is_dir else get_format_from_name(name)
+
+        return unf_types.Node(
+            id=path or "",
+            text=name,
+            icon="fa fa-folder" if entry.is_dir else file_icon(fmt),
+            parent="/".join(parts[:-1]) if parts[:-1] else "#",
+            data=self._prepare_table_data(entry),
+        )
+
+    def _prepare_table_data(self, entry: unf_types.Entry) -> dict[str, Any]:
+        return {
+            "size": printable_file_size(entry.size) if entry.size else "",
+            "modified_at": tk.h.render_datetime(
+                entry.mtime, date_format=DEFAULT_DATE_FORMAT
+            )
+            or "",
+        }

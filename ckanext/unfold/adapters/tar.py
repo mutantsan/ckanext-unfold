@@ -4,13 +4,9 @@ import logging
 from io import BytesIO
 from tarfile import TarError, TarInfo
 from tarfile import open as tar_open
-from typing import Any, Literal
+from typing import Literal
 
-import ckan.plugins.toolkit as tk
-
-import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
-import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.adapters.base import BaseAdapter
 from ckanext.unfold.formatting import datetime_from_timestamp
 
@@ -19,50 +15,30 @@ log = logging.getLogger(__name__)
 
 class TarAdapter(BaseAdapter):
     mode: Literal["r", "r:gz", "r:xz", "r:bz2"] = "r"
+    open_errors = (TarError,)
 
-    def get_node_list(self) -> list[unf_types.Node]:
-        try:
-            file_list = self.get_file_list_from_url(self.filepath)
-        except TarError as e:
-            raise unf_exception.UnfoldError(f"Error opening archive: {e}") from e
+    def iter_entries(self) -> list[unf_types.Entry]:
+        """List a tar archive's entries.
 
-        return [self._build_node(entry) for entry in file_list]
-
-    def _build_node(self, entry: TarInfo) -> unf_types.Node:
-        parts = [p for p in entry.name.split("/") if p]
-        name = unf_utils.name_from_path(entry.name)
-        fmt = "folder" if entry.isdir() else unf_utils.get_format_from_name(name)
-
-        return unf_types.Node(
-            id=entry.name.rstrip("/") or "",
-            text=unf_utils.name_from_path(entry.name),
-            icon="fa fa-folder" if entry.isdir() else unf_utils.file_icon(fmt),
-            state={"opened": True},
-            parent="/".join(parts[:-1]) if parts[:-1] else "#",
-            data=self._prepare_table_data(entry),
-        )
-
-    def _prepare_table_data(self, entry: TarInfo) -> dict[str, Any]:
-        modified_at = tk.h.render_datetime(
-            datetime_from_timestamp(entry.mtime),
-            date_format=unf_utils.DEFAULT_DATE_FORMAT,
-        )
-
-        return {
-            "size": unf_utils.printable_file_size(entry.size) if entry.size else "",
-            "modified_at": modified_at or "",
-        }
-
-    def get_file_list_from_url(self, url: str) -> list[TarInfo]:
-        """Download an archive and fetch a file list.
-
-        Tar file doesn't allow us to download it partially
-        and fetch only file list, because the information
-        about each file is stored at the beginning of the file
+        Tar doesn't allow us to download it partially and fetch only the
+        file list, because the information about each file is stored
+        alongside its data rather than in one central index.
         """
-        content = self.get_file_content(url)
+        content = self.get_file_content()
 
-        return tar_open(fileobj=BytesIO(content), mode=self.mode).getmembers()
+        return [
+            self._to_entry(m)
+            for m in tar_open(fileobj=BytesIO(content), mode=self.mode).getmembers()
+        ]
+
+    @staticmethod
+    def _to_entry(entry: TarInfo) -> unf_types.Entry:
+        return unf_types.Entry(
+            path=entry.name.rstrip("/"),
+            is_dir=entry.isdir(),
+            size=entry.size,
+            mtime=datetime_from_timestamp(entry.mtime),
+        )
 
 
 class TarGzAdapter(TarAdapter):

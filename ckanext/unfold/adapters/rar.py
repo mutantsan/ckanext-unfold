@@ -2,17 +2,13 @@ from __future__ import annotations
 
 import logging
 from io import BytesIO
-from typing import Any
 
 import rarfile
 from rarfile import Error as RarError
 from rarfile import RarInfo
 
-import ckan.plugins.toolkit as tk
-
 import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
-import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.adapters.base import BaseAdapter
 from ckanext.unfold.formatting import datetime_from_dos
 
@@ -20,26 +16,15 @@ log = logging.getLogger(__name__)
 
 
 class RarAdapter(BaseAdapter):
-    def get_node_list(self) -> list[unf_types.Node]:
-        try:
-            file_list = self.get_file_list_from_url(self.filepath)
-        except RarError as e:
-            raise unf_exception.UnfoldError(f"Error opening archive: {e}") from e
+    open_errors = (RarError,)
 
-        if not file_list:
-            raise unf_exception.UnfoldError(
-                "Error. The archive is either empty or the password is incorrect."
-            )
+    def iter_entries(self) -> list[unf_types.Entry]:
+        """List a RAR archive's entries.
 
-        return [self._build_node(entry) for entry in file_list]
-
-    def get_file_list_from_url(self, url: str) -> list[RarInfo]:
-        """Download an archive and fetch a file list.
-
-        Rar file doesn't allow us to download it partially and fetch only file list.
+        RAR doesn't allow us to download it partially and fetch only the
+        file list.
         """
-        content = self.get_file_content(url)
-
+        content = self.get_file_content()
         archive = rarfile.RarFile(BytesIO(content))
 
         needs_password = archive.needs_password()
@@ -50,42 +35,25 @@ class RarAdapter(BaseAdapter):
         if needs_password:
             archive.setpassword(self.resource_view["archive_pass"])
 
-        return archive.infolist()
+        file_list = archive.infolist()
 
-    def _build_node(self, entry: RarInfo) -> unf_types.Node:
-        filename = entry.filename or ""
-        parts = [p for p in filename.split("/") if p]
-        name = unf_utils.name_from_path(filename)
-        fmt = "" if entry.isdir() else unf_utils.get_format_from_name(name)
-
-        return unf_types.Node(
-            id=filename.rstrip("/") or "",
-            text=unf_utils.name_from_path(filename),
-            icon="fa fa-folder" if entry.isdir() else unf_utils.file_icon(fmt),
-            state={"opened": True},
-            parent="/".join(parts[:-1]) if parts[:-1] else "#",
-            data=self._prepare_table_data(entry),
-        )
-
-    def _prepare_table_data(self, entry: RarInfo) -> dict[str, Any]:
-        return {
-            "size": (
-                unf_utils.printable_file_size(entry.compress_size)
-                if entry.compress_size
-                else ""
-            ),
-            "modified_at": self._fetch_mtime(entry),
-        }
-
-    def _fetch_mtime(self, entry: RarInfo) -> str:
-        modified_at = tk.h.render_datetime(
-            entry.mtime, date_format=unf_utils.DEFAULT_DATE_FORMAT
-        )
-
-        if not modified_at and isinstance(entry.date_time, tuple):
-            modified_at = tk.h.render_datetime(
-                datetime_from_dos(entry.date_time),
-                date_format=unf_utils.DEFAULT_DATE_FORMAT,
+        if not file_list:
+            raise unf_exception.UnfoldError(
+                "Error. The archive is either empty or the password is incorrect."
             )
 
-        return modified_at or ""
+        return [self._to_entry(info) for info in file_list]
+
+    @staticmethod
+    def _to_entry(entry: RarInfo) -> unf_types.Entry:
+        mtime = entry.mtime
+
+        if mtime is None and isinstance(entry.date_time, tuple):
+            mtime = datetime_from_dos(entry.date_time)
+
+        return unf_types.Entry(
+            path=(entry.filename or "").rstrip("/"),
+            is_dir=entry.isdir(),
+            size=entry.compress_size,
+            mtime=mtime,
+        )

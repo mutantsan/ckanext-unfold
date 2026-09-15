@@ -2,97 +2,34 @@ from __future__ import annotations
 
 import logging
 from io import BytesIO
-from typing import Any
 
 from rpmfile import RPMFile, RPMInfo
 
-import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
-import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.adapters.base import BaseAdapter
 
 log = logging.getLogger(__name__)
 
 
 class RpmAdapter(BaseAdapter):
-    def get_node_list(self) -> list[unf_types.Node]:
-        try:
-            file_list = self.get_file_list_from_url(self.filepath)
-        except (NotImplementedError, KeyError) as e:
-            raise unf_exception.UnfoldError(f"Error opening archive: {e}") from e
+    open_errors = (NotImplementedError, KeyError)
 
-        nodes = [self._build_node(entry) for entry in file_list]
+    def iter_entries(self) -> list[unf_types.Entry]:
+        """List an RPM's entries.
 
-        return self._add_folder_nodes(nodes)
-
-    def _build_node(self, entry: RPMInfo) -> unf_types.Node:
-        parts = [p for p in entry.name.split("/") if p]
-        name = unf_utils.name_from_path(entry.name)
-        fmt = "folder" if entry.isdir else unf_utils.get_format_from_name(name)
-
-        return unf_types.Node(
-            id=entry.name.rstrip("/") or "",
-            text=unf_utils.name_from_path(entry.name),
-            icon="fa fa-folder" if entry.isdir else unf_utils.file_icon(fmt),
-            parent="/".join(parts[:-1]) if parts[:-1] else "#",
-            data=self._prepare_table_data(entry),
-        )
-
-    def _prepare_table_data(self, entry: RPMInfo) -> dict[str, Any]:
-        return {
-            "size": unf_utils.printable_file_size(entry.size) if entry.size else "",
-            "modified_at": "",  # rpmfile doesn't provide this info
-        }
-
-    def get_file_list_from_url(self, url: str) -> list[RPMInfo]:
-        """Download an archive and fetch a file list.
-
-        Tar file doesn't allow us to download it partially
-        and fetch only file list, because the information
-        about each file is stored at the beggining of the file
+        Tar doesn't allow us to download it partially and fetch only the
+        file list, because the information about each file is stored at the
+        beginning of the file. RPM's cpio payload also never includes
+        explicit directory entries, so every ancestor folder is synthesized
+        by the base class.
         """
-        content = self.get_file_content(url)
+        content = self.get_file_content()
+        members = RPMFile(fileobj=BytesIO(content)).getmembers()
 
-        return RPMFile(fileobj=BytesIO(content)).getmembers()
+        return [self._to_entry(m) for m in members]
 
-    def _add_folder_nodes(self, nodes: list[unf_types.Node]) -> list[unf_types.Node]:
-        folder_nodes: dict[str, unf_types.Node] = {}
-
-        for node in nodes:
-            if node.parent == "#":
-                continue
-
-            self._build_parent_node(node.parent, folder_nodes)
-
-        return nodes + list(folder_nodes.values())
-
-    def _build_parent_node(
-        self, parent: str, nodes: dict[str, unf_types.Node]
-    ) -> dict[str, unf_types.Node]:
-        parts = [p for p in parent.split("/") if p]
-
-        if not parts:
-            return nodes
-
-        bottom = parent == "."
-
-        nodes.setdefault(
-            parent,
-            unf_types.Node(
-                id=parent,
-                text=parent,
-                icon="fa fa-folder",
-                parent="#" if bottom else "/".join(parts[:-1]),
-                data={
-                    "size": "",
-                    "type": "folder",
-                    "format": "",
-                    "modified_at": "--",
-                },
-            ),
+    @staticmethod
+    def _to_entry(entry: RPMInfo) -> unf_types.Entry:
+        return unf_types.Entry(
+            path=entry.name.rstrip("/"), is_dir=bool(entry.isdir), size=entry.size
         )
-
-        if not bottom:
-            self._build_parent_node("/".join(parts[:-1]), nodes)
-
-        return nodes

@@ -2,6 +2,8 @@
 
 from datetime import timezone
 
+import pytest
+
 from ckanext.unfold import formatting
 
 
@@ -36,3 +38,45 @@ def test_datetime_from_timestamp():
     assert value.strftime("%d/%m/%Y - %H:%M") == "01/01/1970 - 00:00"
     assert formatting.datetime_from_timestamp(None) is None
     assert formatting.datetime_from_timestamp(10**20) is None
+
+
+@pytest.mark.parametrize(
+    ("fmt", "icon"),
+    [
+        ("png", "fa fa-file-image"),
+        (".PNG", "fa fa-file-image"),
+        ("tar", "fa fa-file-archive"),
+        ("csv", "fa fa-file-csv"),
+        ("md", formatting.DEFAULT_ICON),
+        ("", formatting.DEFAULT_ICON),
+    ],
+)
+def test_get_icon_by_format(fmt: str, icon: str):
+    assert formatting.get_icon_by_format(fmt) == icon
+
+
+@pytest.mark.parametrize(
+    ("fmt", "icon"),
+    [
+        ("png", "fa fa-file-image format-png"),
+        (".PNG", "fa fa-file-image format-png"),
+        ("csv", "fa fa-file-csv format-csv"),
+        # unknown extension: falls back to the default icon, keeps its class
+        # (a theme may still style `.format-md` even without a dedicated
+        # font-awesome icon for it)
+        ("md", f"{formatting.DEFAULT_ICON} format-md"),
+        # no extension at all: nothing to key a format class on
+        ("", formatting.DEFAULT_ICON),
+    ],
+)
+def test_file_icon(fmt: str, icon: str):
+    assert formatting.file_icon(fmt) == icon
+
+
+def test_name_and_format_from_path():
+    assert formatting.name_from_path("a/b/c.txt") == "c.txt"
+    assert formatting.name_from_path("a/b/") == "b"
+    assert formatting.name_from_path("") == ""
+    assert formatting.name_from_path(None) == ""
+    assert formatting.get_format_from_name("c.txt") == ".txt"
+    assert formatting.get_format_from_name("Makefile") == ""

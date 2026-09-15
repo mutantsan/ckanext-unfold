@@ -2,53 +2,28 @@ from __future__ import annotations
 
 import logging
 from io import BytesIO
-from typing import Any
 
 from ar import Archive, ArchiveError
 from ar.archive import ArPath
 
-import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
-import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.adapters.base import BaseAdapter
 
 log = logging.getLogger(__name__)
 
 
 class ArAdapter(BaseAdapter):
-    def get_node_list(self) -> list[unf_types.Node]:
-        try:
-            file_list = self.get_file_list_from_url(self.filepath)
-        except ArchiveError as e:
-            raise unf_exception.UnfoldError(f"Error opening archive: {e}") from e
+    open_errors = (ArchiveError,)
 
-        return [self._build_node(entry) for entry in file_list]
+    def iter_entries(self) -> list[unf_types.Entry]:
+        """List an ar archive's entries. ar archives have no directories."""
+        content = self.get_file_content()
+        archive = Archive(BytesIO(content))
 
-    def _build_node(self, entry: ArPath) -> unf_types.Node:
-        parts = [p for p in entry.name.split("/") if p]
-        name = unf_utils.name_from_path(entry.name)
+        return [self._to_entry(e) for e in archive.entries]
 
-        return unf_types.Node(
-            id=entry.name.rstrip("/") or "",
-            text=unf_utils.name_from_path(entry.name),
-            icon=unf_utils.file_icon(unf_utils.get_format_from_name(name)),
-            parent="/".join(parts[:-1]) if parts[:-1] else "#",
-            data=self._prepare_table_data(entry),
+    @staticmethod
+    def _to_entry(entry: ArPath) -> unf_types.Entry:
+        return unf_types.Entry(
+            path=entry.name.rstrip("/"), is_dir=False, size=entry.size
         )
-
-    def _prepare_table_data(self, entry: ArPath) -> dict[str, Any]:
-        return {
-            "size": (unf_utils.printable_file_size(entry.size) if entry.size else ""),
-            "modified_at": "",
-        }
-
-    def get_file_list_from_url(self, url: str) -> list[ArPath]:
-        """Download an archive and fetch a file list."""
-        content = self.get_file_content(url)
-
-        try:
-            archive = Archive(BytesIO(content))
-        except ArchiveError as e:
-            raise unf_exception.UnfoldError(f"Error opening archive: {e}") from e
-
-        return archive.entries

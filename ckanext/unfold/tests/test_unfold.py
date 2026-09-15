@@ -8,8 +8,9 @@ import py7zr
 import pytest
 import rarfile
 
-from ckanext.unfold import exception, utils
+from ckanext.unfold import exception, types, utils
 from ckanext.unfold.adapters import remote
+from ckanext.unfold.adapters.base import BaseAdapter
 from ckanext.unfold.adapters.zip import ZipAdapter
 from ckanext.unfold.tests import snapshots
 from ckanext.unfold.tests.helpers import (
@@ -447,17 +448,23 @@ def test_zip_server_ignoring_range_is_capped(requests_mock):
 
 
 def test_ensure_dir_entries_infers_missing_folders():
+    """The shared base-class synthesis every adapter's ``build_nodes`` uses."""
     entries = [
-        zipfile.ZipInfo("a/b/c.txt"),
-        zipfile.ZipInfo("a/d.txt"),
-        zipfile.ZipInfo("e/"),
+        types.Entry(path="a/b/c.txt", is_dir=False),
+        types.Entry(path="a/d.txt", is_dir=False),
+        types.Entry(path="e", is_dir=True),
     ]
 
-    result = ZipAdapter.ensure_dir_entries(ZipAdapter, entries)  # type: ignore[arg-type]
-    names = {zi.filename for zi in result}
+    result = BaseAdapter._ensure_dir_entries(entries)
+    by_path = {e.path: e.is_dir for e in result}
 
-    assert names == {"a/b/c.txt", "a/d.txt", "e/", "a/", "a/b/"}
-    assert all(zi.is_dir() for zi in result if zi.filename in ("a/", "a/b/"))
+    assert by_path == {
+        "a/b/c.txt": False,
+        "a/d.txt": False,
+        "e": True,
+        "a": True,
+        "a/b": True,
+    }
 
 
 def test_remote_range_file_reads_across_blocks(requests_mock):

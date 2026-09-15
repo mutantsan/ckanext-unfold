@@ -2,17 +2,12 @@ from __future__ import annotations
 
 import logging
 from io import BytesIO
-from typing import Any
 
 import py7zr
-import requests
 from py7zr import FileInfo, exceptions
-
-import ckan.plugins.toolkit as tk
 
 import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
-import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.adapters.base import BaseAdapter
 
 log = logging.getLogger(__name__)
@@ -21,7 +16,7 @@ log = logging.getLogger(__name__)
 class SevenZipAdapter(BaseAdapter):
     def get_node_list(self) -> list[unf_types.Node]:
         try:
-            file_list = self.get_file_list_from_url(self.filepath)
+            entries = self.iter_entries()
         except exceptions.PasswordRequired as e:
             # raised on open when the header itself is encrypted; not an
             # ArchiveError subclass
@@ -30,50 +25,28 @@ class SevenZipAdapter(BaseAdapter):
             ) from e
         except exceptions.ArchiveError as e:
             raise unf_exception.UnfoldError(f"Error opening archive: {e}") from e
-        except requests.RequestException as e:
-            raise unf_exception.UnfoldError(f"Error fetching archive: {e}") from e
 
-        return [self._build_node(entry) for entry in file_list]
+        return self.build_nodes(entries)
 
-    def _build_node(self, entry: FileInfo) -> unf_types.Node:
-        parts = [p for p in entry.filename.split("/") if p]
-        name = unf_utils.name_from_path(entry.filename)
-        fmt = "folder" if entry.is_directory else unf_utils.get_format_from_name(name)
+    def iter_entries(self) -> list[unf_types.Entry]:
+        """List a 7z archive's entries.
 
-        return unf_types.Node(
-            id=entry.filename.rstrip("/") or "",
-            text=unf_utils.name_from_path(entry.filename),
-            icon="fa fa-folder" if entry.is_directory else unf_utils.file_icon(fmt),
-            state={"opened": True},
-            parent="/".join(parts[:-1]) if parts[:-1] else "#",
-            data=self._prepare_table_data(entry),
-        )
-
-    def _prepare_table_data(self, entry: FileInfo) -> dict[str, Any]:
-        modified_at = tk.h.render_datetime(
-            entry.creationtime, date_format=unf_utils.DEFAULT_DATE_FORMAT
-        )
-
-        return {
-            "size": (
-                unf_utils.printable_file_size(entry.compressed)
-                if entry.compressed
-                else ""
-            ),
-            "modified_at": modified_at or "",
-        }
-
-    def get_file_list_from_url(self, url: str) -> list[FileInfo]:
-        """Download an archive and fetch a file list.
-
-        7z file doesn't allow us to download it partially
-        and fetch only file list.
+        7z doesn't allow us to download it partially and fetch only the
+        file list.
         """
-        content = self.get_file_content(url)
-
+        content = self.get_file_content()
         archive = py7zr.SevenZipFile(BytesIO(content))
 
         if archive.needs_password():
             raise unf_exception.UnfoldError("Error. Archive is protected with password")
 
-        return archive.list()
+        return [self._to_entry(info) for info in archive.list()]
+
+    @staticmethod
+    def _to_entry(entry: FileInfo) -> unf_types.Entry:
+        return unf_types.Entry(
+            path=entry.filename.rstrip("/"),
+            is_dir=entry.is_directory,
+            size=entry.compressed,
+            mtime=entry.creationtime,
+        )

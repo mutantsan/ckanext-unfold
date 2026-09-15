@@ -2,10 +2,26 @@ from __future__ import annotations
 
 from collections.abc import Hashable
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Generic, TypeVar
 
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")
+
+
+@dataclass
+class Entry:
+    """One archive entry, in whatever shape every adapter's own library uses.
+
+    Adapters translate their library's entry type into this; ``BaseAdapter``
+    turns a list of these into ``Node`` objects, synthesizing any missing
+    ancestor directories along the way (see ``BaseAdapter._ensure_dir_entries``).
+    """
+
+    path: str
+    is_dir: bool
+    size: int | None = None
+    mtime: datetime | None = None
 
 
 @dataclass
