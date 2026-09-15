@@ -24,7 +24,6 @@ from ckanext.unfold.index import (
     search_paths,
 )
 
-REDIS_CACHE_TTL = 3600 * 24  # 24 hour
 log = logging.getLogger(__name__)
 
 
@@ -85,7 +84,7 @@ class UnfoldCacheManager:
         for start in range(0, len(items), cls._BATCH):
             pipe.hset(key, mapping=dict(items[start : start + cls._BATCH]))
 
-        pipe.expire(key, REDIS_CACHE_TTL)
+        pipe.expire(key, unf_config.get_cache_ttl())
         pipe.execute()
 
     @classmethod

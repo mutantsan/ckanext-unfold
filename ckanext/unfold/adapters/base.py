@@ -19,7 +19,6 @@ import ckanext.unfold.config as unf_config
 import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
 from ckanext.unfold.adapters import remote
-from ckanext.unfold.adapters.remote import DEFAULT_TIMEOUT
 from ckanext.unfold.formatting import (
     DEFAULT_DATE_FORMAT,
     file_icon,
@@ -30,7 +29,7 @@ from ckanext.unfold.formatting import (
 
 log = logging.getLogger(__name__)
 
-__all__ = ["DEFAULT_TIMEOUT", "BaseAdapter"]
+__all__ = ["BaseAdapter"]
 
 
 class BaseAdapter:
@@ -53,11 +52,9 @@ class BaseAdapter:
         resource: dict[str, Any],
         resource_view: dict[str, Any],
         filepath: str | None = None,
-        **kwargs: Any,
     ) -> None:
         self.resource = resource
         self.resource_view = resource_view
-        self.kwargs = kwargs
         self.filepath = filepath or self._get_filepath()
 
     def _get_filepath(self) -> str:
@@ -135,7 +132,9 @@ class BaseAdapter:
             return self._read_upload()
 
         return remote.fetch_full(
-            url or self.filepath, unf_config.get_max_file_size(), DEFAULT_TIMEOUT
+            url or self.filepath,
+            unf_config.get_max_file_size(),
+            unf_config.get_request_timeout(),
         )
 
     def _read_upload(self) -> bytes:
@@ -183,7 +182,9 @@ class BaseAdapter:
             self.filepath,
         )
         return remote.fetch_full(
-            self.filepath, unf_config.get_max_file_size(), DEFAULT_TIMEOUT
+            self.filepath,
+            unf_config.get_max_file_size(),
+            unf_config.get_request_timeout(),
         )
 
     def _local_upload_path(self, upload: Any) -> str | None:
@@ -241,7 +242,35 @@ class BaseAdapter:
 
     def build_nodes(self, entries: list[unf_types.Entry]) -> list[unf_types.Node]:
         """Turn entries into nodes, synthesizing any missing ancestor folders."""
+        entries = self._enforce_entry_limit(list(entries))
         return [self._build_node(e) for e in self._ensure_dir_entries(entries)]
+
+    def _enforce_entry_limit(
+        self, entries: list[unf_types.Entry]
+    ) -> list[unf_types.Entry]:
+        """Truncate to the configured maximum entry count.
+
+        Most archive libraries parse their whole member list up front, so
+        this cannot save the parsing cost for those formats -- but it does
+        cap the downstream cost: millions of ``Node`` objects, a
+        multi-hundred-megabyte cache entry, and a browser tab that never
+        finishes rendering. Formats that can stop early (tar, see
+        ``TarAdapter.iter_entries``) apply the same limit during iteration
+        instead, so this is a no-op for them by the time it runs.
+        """
+        limit = unf_config.get_max_entries()
+
+        if len(entries) <= limit:
+            return entries
+
+        log.warning(
+            "Resource %s: archive has %s entries, more than the configured "
+            "maximum of %s; the rest are not shown",
+            self.resource.get("id"),
+            len(entries),
+            limit,
+        )
+        return entries[:limit]
 
     @staticmethod
     def _ensure_dir_entries(entries: list[unf_types.Entry]) -> list[unf_types.Entry]:

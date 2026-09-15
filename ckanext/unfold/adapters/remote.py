@@ -18,9 +18,12 @@ without a CKAN runtime.
 from __future__ import annotations
 
 import io
+import ipaddress
 import logging
+import socket
 import time
 from typing import IO
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -37,6 +40,10 @@ CHUNK_SIZE = 64 * 1024
 # the central directory. Fetching in fixed blocks keeps the number of Range
 # requests small while transferring little more than what the parser reads.
 BLOCK_SIZE = 256 * 1024
+
+ALLOWED_SCHEMES = frozenset({"http", "https"})
+MAX_REDIRECTS = 5
+BLOCKED_URL_MESSAGE = "Error. Could not fetch the archive"
 
 
 def limit_message(max_bytes: int) -> str:
@@ -70,6 +77,95 @@ def total_from_content_range(value: str | None) -> int | None:
     return int(total) if total.isdigit() else None
 
 
+def _resolves_to_public_address(hostname: str) -> bool:
+    """Whether every address ``hostname`` resolves to is publicly routable.
+
+    A resource URL is set by whoever creates the resource, and every archive
+    view triggers a server-side GET to it, so without this an editor (or an
+    imported/harvested dataset) could point the server at loopback,
+    link-local or RFC 1918 addresses -- cloud instance metadata endpoints and
+    internal admin ports included.
+
+    A hostname that fails to resolve at all is let through: the request will
+    simply fail the same way immediately afterwards (same resolver, same
+    result), so blocking it here would add no protection -- and it keeps
+    documentation/test hostnames (the reserved ``.test`` TLD, for instance)
+    working without a real DNS record.
+    """
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except OSError:
+        return True
+
+    for info in infos:
+        ip = info[4][0]
+
+        try:
+            if not ipaddress.ip_address(ip).is_global:
+                return False
+        except ValueError:
+            return False
+
+    return True
+
+
+def validate_url(url: str) -> None:
+    """Reject a URL that is unsafe for the server to fetch on the caller's
+    behalf (SSRF hardening): only ``http``/``https`` with a host that
+    resolves exclusively to publicly routable addresses is allowed.
+
+    The failure is reported generically and logged with the detail server
+    side, rather than surfacing the resolved address or the reason to the
+    caller.
+    """
+    parsed = urlparse(url)
+
+    if parsed.scheme not in ALLOWED_SCHEMES or not parsed.hostname:
+        log.warning("Refusing to fetch %s: not an http(s) URL", url)
+        raise UnfoldError(BLOCKED_URL_MESSAGE)
+
+    if not _resolves_to_public_address(parsed.hostname):
+        log.warning("Refusing to fetch %s: resolves to a non-public address", url)
+        raise UnfoldError(BLOCKED_URL_MESSAGE)
+
+
+def safe_get(
+    url: str,
+    *,
+    timeout: float,
+    headers: dict[str, str] | None = None,
+    stream: bool = False,
+) -> requests.Response:
+    """A ``requests.get`` that blocks unsafe destinations (see
+    ``validate_url``) and never follows a redirect without re-validating it
+    first -- a URL that passes the check can otherwise 302 straight to a
+    blocked address.
+    """
+    for _ in range(MAX_REDIRECTS + 1):
+        validate_url(url)
+
+        resp = requests.get(
+            url,
+            headers=headers,
+            timeout=timeout,
+            stream=stream,
+            allow_redirects=False,
+        )
+
+        if not (resp.is_redirect or resp.is_permanent_redirect):
+            return resp
+
+        location = resp.headers.get("location")
+        resp.close()
+
+        if not location:
+            raise UnfoldError(BLOCKED_URL_MESSAGE)
+
+        url = urljoin(url, location)
+
+    raise UnfoldError("Error. Too many redirects while fetching the archive")
+
+
 def read_limited(resp: requests.Response, max_bytes: int) -> bytes:
     """Read a streamed response body, aborting once it exceeds ``max_bytes``.
 
@@ -93,7 +189,7 @@ def fetch_full(url: str, max_bytes: int, timeout: float = DEFAULT_TIMEOUT) -> by
     log.info("Downloading %s (limit %s bytes)", url, max_bytes)
 
     try:
-        with requests.get(url, timeout=timeout, stream=True) as resp:
+        with safe_get(url, timeout=timeout, stream=True) as resp:
             resp.raise_for_status()
             check_limit(content_length(resp.headers.get("content-length")), max_bytes)
 
@@ -250,21 +346,26 @@ class RemoteRangeFile(io.RawIOBase):
         )
 
         try:
-            resp = requests.get(
+            with safe_get(
                 self.url,
                 headers={"Range": f"bytes={start}-{end}"},
                 timeout=self.timeout,
-            )
-            resp.raise_for_status()
+                stream=True,
+            ) as resp:
+                resp.raise_for_status()
+
+                if resp.status_code != requests.codes.partial_content:
+                    raise UnfoldError(
+                        "Error. The server does not support partial downloads "
+                        "(HTTP Range)"
+                    )
+
+                # Bounded to `wanted`, not just `max_bytes`: a server that
+                # returns 206 but ignores the requested end of the range (or
+                # lies about it) must not buffer more than what was asked for.
+                data = read_limited(resp, wanted)
         except requests.RequestException as e:
             raise UnfoldError(f"Error fetching remote archive: {e}") from e
-
-        if resp.status_code != requests.codes.partial_content:
-            raise UnfoldError(
-                "Error. The server does not support partial downloads (HTTP Range)"
-            )
-
-        data = resp.content
 
         if len(data) != wanted:
             raise UnfoldError("Error. The server returned an incomplete byte range")
@@ -276,7 +377,10 @@ class RemoteRangeFile(io.RawIOBase):
 
 
 def open_remote(
-    url: str, max_bytes: int, timeout: float = DEFAULT_TIMEOUT
+    url: str,
+    max_bytes: int,
+    timeout: float = DEFAULT_TIMEOUT,
+    block_size: int = BLOCK_SIZE,
 ) -> IO[bytes]:
     """Open a remote file for random access as a binary file object.
 
@@ -292,12 +396,12 @@ def open_remote(
     * ``200``: the server ignores ranges and sends the whole body. It is
       accepted only within ``max_bytes``.
     """
-    log.info("Probing %s with a %s-byte suffix Range request", url, BLOCK_SIZE)
+    log.info("Probing %s with a %s-byte suffix Range request", url, block_size)
 
     try:
-        with requests.get(
+        with safe_get(
             url,
-            headers={"Range": f"bytes=-{BLOCK_SIZE}"},
+            headers={"Range": f"bytes=-{block_size}"},
             timeout=timeout,
             stream=True,
         ) as resp:
@@ -339,9 +443,11 @@ def open_remote(
 
     # ``final_url`` is where the redirects ended (e.g. a signed storage URL);
     # reusing it saves a redirect round trip on every Range request.
-    remote = RemoteRangeFile(final_url or url, total, max_bytes, timeout=timeout)
+    remote = RemoteRangeFile(
+        final_url or url, total, max_bytes, block_size=block_size, timeout=timeout
+    )
     remote.seed(total - len(tail), tail)
     remote.bytes_fetched = len(tail)
     remote.requests_made = 1
 
-    return io.BufferedReader(remote, buffer_size=BLOCK_SIZE)
+    return io.BufferedReader(remote, buffer_size=block_size)

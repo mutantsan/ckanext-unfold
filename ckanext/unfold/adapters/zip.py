@@ -7,7 +7,7 @@ from zipfile import BadZipFile, LargeZipFile, ZipFile, ZipInfo
 import ckanext.unfold.config as unf_config
 import ckanext.unfold.types as unf_types
 from ckanext.unfold.adapters import remote
-from ckanext.unfold.adapters.base import DEFAULT_TIMEOUT, BaseAdapter
+from ckanext.unfold.adapters.base import BaseAdapter
 from ckanext.unfold.formatting import datetime_from_dos
 
 log = logging.getLogger(__name__)
@@ -42,7 +42,12 @@ class ZipAdapter(BaseAdapter):
         Servers that ignore ``Range`` return the whole file, which is
         accepted only within the limit.
         """
-        fp = remote.open_remote(url, unf_config.get_max_file_size(), DEFAULT_TIMEOUT)
+        fp = remote.open_remote(
+            url,
+            unf_config.get_max_file_size(),
+            unf_config.get_request_timeout(),
+            unf_config.get_zip_tail_block_size(),
+        )
 
         with fp, ZipFile(fp) as archive:
             return archive.infolist()

@@ -45,3 +45,51 @@ groups:
         description: |
           If true, the right click context menu will be enabled by default in the tree view.
           If false, if node contains a link, it can be opened by left clicking on it.
+
+      - key: ckanext.unfold.request_timeout
+        type: int
+        default: 60
+        validators: is_positive_integer
+        description: |
+          Per-request HTTP timeout, in seconds, used for every request made while
+          fetching a remote resource (connect and read).
+
+      - key: ckanext.unfold.cache_ttl
+        type: int
+        default: 86400 # 24 hours
+        validators: is_positive_integer
+        description: |
+          How long, in seconds, a resource's archive index stays cached in Redis
+          before it is rebuilt on the next view. Only used when caching is enabled.
+
+      - key: ckanext.unfold.zip_tail_block_size
+        type: int
+        default: 262144 # 256KB
+        validators: is_positive_integer
+        description: |
+          Size, in bytes, of the suffix Range request used to probe a remote zip
+          archive for its central directory. Larger values mean fewer follow-up
+          requests for archives with a large directory, at the cost of
+          transferring more than necessary for small ones.
+
+      - key: ckanext.unfold.max_entries
+        type: int
+        default: 200000
+        validators: is_positive_integer
+        description: |
+          Maximum number of entries read from one archive. Archives with more
+          entries than this are truncated; the rest are not shown. Protects
+          against an archive with an enormous number of tiny entries turning
+          into millions of DOM nodes and a multi-hundred-megabyte cache entry.
+          Kept well above the 65,535-entry ZIP64 threshold so large but
+          legitimate archives are not truncated.
+
+      - key: ckanext.unfold.max_decompressed_size
+        type: int
+        default: 524288000 # 500MB
+        validators: is_positive_integer
+        description: |
+          Maximum decompressed size, in bytes, allowed while reading a compressed
+          tar archive (.tar.gz, .tar.xz, .tar.bz2). Protects against a small
+          compressed file that decompresses to a huge size, costing minutes of
+          web worker CPU time (a "decompression bomb").

@@ -4,7 +4,7 @@ from dataclasses import asdict
 
 import pytest
 
-from ckanext.unfold import index, utils
+from ckanext.unfold import config, index, utils
 from ckanext.unfold.tests.helpers import BASE_URL, range_response, read_fixture
 from ckanext.unfold.types import Node
 
@@ -58,7 +58,7 @@ def test_saved_index_expires(small_index):
     conn = utils.UnfoldCacheManager._ensure_conn()
     ttl = conn.ttl(utils.UnfoldCacheManager._key("res-1"))
 
-    assert 0 < ttl <= utils.REDIS_CACHE_TTL
+    assert 0 < ttl <= config.get_cache_ttl()
 
 
 @pytest.mark.usefixtures("clean_redis")
