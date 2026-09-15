@@ -168,3 +168,37 @@ ul.vakata-context {
         background-color: #d0d5dd;
     }
 }
+
+.unfold-search-results {
+    margin-bottom: 1rem;
+    max-height: 700px;
+    overflow-y: auto;
+
+    .unfold-result {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.75rem;
+        border-bottom: 1px solid #eef0f2;
+
+        .unfold-result-path {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .unfold-node-metadata {
+            margin-left: auto;
+            white-space: nowrap;
+        }
+
+        &--empty {
+            color: #6c757d;
+        }
+    }
+}
+
+.jstree-default .unfold-load-more > .jstree-anchor {
+    font-style: italic;
+    color: #0d6efd;
+}

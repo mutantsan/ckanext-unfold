@@ -24,10 +24,20 @@ groups:
         default: 2000
         validators: is_positive_integer
         description: |
-          Threshold for automatically expanding nodes in the UI tree view.
-          If the number of nodes is less than or equal to this value, the tree will be fully expanded by default.
-          If the number of nodes exceeds this value, the tree will be collapsed by default.
-          Set to 0 to always collapse nodes. Expanding too many nodes may impact performance.
+          Archives with at most this many entries are sent to the browser in one
+          request and shown fully expanded. Larger archives are loaded folder by
+          folder as the user opens them, and search runs on the server. Keep this
+          in the low thousands: every entry above it becomes a DOM node at once.
+          Must be at least 1.
+
+      - key: ckanext.unfold.page_size
+        type: int
+        default: 500
+        validators: is_positive_integer
+        description: |
+          For archives above the expand threshold, how many entries of one
+          folder are sent per request. A folder with more children shows a
+          "Show more" row that loads the next page.
 
       - key: ckanext.unfold.show_context_menu_default
         type: bool

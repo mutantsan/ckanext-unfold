@@ -23,4 +23,4 @@ ADAPTERS: dict[str, type[BaseAdapter]] = {
 
 adapter_registry: unf_types.Registry[str, type[BaseAdapter]] = Registry(ADAPTERS)
 
-__all__ = ["adapter_registry", "BaseAdapter", "ADAPTERS", "Registry"]
+__all__ = ["ADAPTERS", "BaseAdapter", "Registry", "adapter_registry"]

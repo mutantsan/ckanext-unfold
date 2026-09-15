@@ -3,22 +3,27 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import requests
-
-import ckan.lib.files as files
-import ckan.lib.uploader as uploader
+from ckan.lib import files, uploader
 
 import ckanext.unfold.config as unf_config
 import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
-import ckanext.unfold.utils as unf_utils
+from ckanext.unfold.adapters import remote
+from ckanext.unfold.adapters.remote import DEFAULT_TIMEOUT
 
 log = logging.getLogger(__name__)
 
-DEFAULT_TIMEOUT = 60  # seconds
+__all__ = ["DEFAULT_TIMEOUT", "BaseAdapter"]
 
 
 class BaseAdapter:
+    #: Set to ``True`` in adapters that can read a remote archive's index
+    #: without downloading the whole file (see ``remote.open_remote``). For
+    #: those the resource's declared size is not checked up front; the size
+    #: limit applies to the bytes actually transferred instead, so archives
+    #: far larger than the limit remain previewable.
+    partial_read: bool = False
+
     def __init__(
         self,
         resource: dict[str, Any],
@@ -45,8 +50,14 @@ class BaseAdapter:
     def is_upload(self) -> bool:
         return self.resource.get("url_type") == "upload"
 
+    @property
+    def reads_partially(self) -> bool:
+        """Whether this adapter will fetch only parts of the remote file."""
+        return self.partial_read and not self.is_upload
+
     def build_archive_tree(self) -> list[unf_types.Node]:
-        self.validate_size_limit()
+        if not self.reads_partially:
+            self.validate_size_limit()
 
         return self.get_node_list()
 
@@ -66,19 +77,7 @@ class BaseAdapter:
 
         ``None`` means the size is unknown and is allowed through.
         """
-        if size is None:
-            return
-
-        max_size = unf_config.get_max_file_size()
-
-        if size < max_size:
-            return
-
-        readable_size = unf_utils.printable_file_size(max_size)
-
-        raise unf_exception.UnfoldError(
-            f"Error. Archive exceeds maximum allowed size for processing: {readable_size}"
-        )
+        remote.check_limit(size, unf_config.get_max_file_size())
 
     def get_file_content(self, url: str | None = None) -> bytes:
         """Return the resource's content as bytes.
@@ -97,27 +96,9 @@ class BaseAdapter:
         if self.is_upload:
             return self._read_upload()
 
-        url = url or self.filepath
-
-        try:
-            with requests.get(url, timeout=DEFAULT_TIMEOUT, stream=True) as resp:
-                resp.raise_for_status()
-
-                self.enforce_size_limit(
-                    self._content_length(resp.headers.get("content-length"))
-                )
-
-                chunks: list[bytes] = []
-                downloaded = 0
-
-                for chunk in resp.iter_content(chunk_size=65536):
-                    downloaded += len(chunk)
-                    self.enforce_size_limit(downloaded)
-                    chunks.append(chunk)
-        except requests.RequestException as e:
-            raise unf_exception.UnfoldError(f"Error fetching archive: {e}") from e
-
-        return b"".join(chunks)
+        return remote.fetch_full(
+            url or self.filepath, unf_config.get_max_file_size(), DEFAULT_TIMEOUT
+        )
 
     def _read_upload(self) -> bytes:
         """Read a locally uploaded resource's bytes via CKAN storage.
@@ -138,10 +119,7 @@ class BaseAdapter:
     @staticmethod
     def _content_length(content_length: str | None) -> int | None:
         """Parse a Content-Length header value into an int."""
-        if content_length and content_length.isdigit():
-            return int(content_length)
-
-        return None
+        return remote.content_length(content_length)
 
     def get_node_list(self) -> list[unf_types.Node]:
         """Return list of nodes representing the file structure."""

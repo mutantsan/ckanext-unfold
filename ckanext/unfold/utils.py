@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import pathlib
+import time
 from dataclasses import asdict
 from typing import Any
 
@@ -16,10 +16,20 @@ import ckanext.unfold.adapters as unf_adapters
 import ckanext.unfold.config as unf_config
 import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
+from ckanext.unfold.formatting import (
+    printable_file_size,  # noqa: F401 (re-exported for adapters)
+)
+from ckanext.unfold.index import (
+    DEFAULT_SEARCH_LIMIT,
+    ROOT,
+    ArchiveIndex,
+    SearchResult,
+    build_search_result,
+    search_paths,
+)
 
 DEFAULT_DATE_FORMAT = "%d/%m/%Y - %H:%M"
 REDIS_CACHE_TTL = 3600 * 24  # 24 hour
-TEMPORARY_LINK_TTL = 300
 log = logging.getLogger(__name__)
 
 
@@ -61,7 +71,10 @@ GROUPED_ICONS = {
         "zip",
         "zipx",
         "gzip",
-        "tar.gz",
+        "gz",
+        "bz2",
+        "xz",
+        "tgz",
         "tar",
         "deb",
         "cbr",
@@ -93,7 +106,7 @@ ICON_BY_FORMAT = {
 
 
 def get_icon_by_format(fmt: str) -> str:
-    return ICON_BY_FORMAT.get(fmt.lstrip("."), DEFAULT_ICON)
+    return ICON_BY_FORMAT.get(fmt.lstrip(".").lower(), DEFAULT_ICON)
 
 
 def name_from_path(path: str | None) -> str:
@@ -104,22 +117,21 @@ def get_format_from_name(name: str) -> str:
     return pathlib.Path(name).suffix
 
 
-def printable_file_size(size_bytes: int) -> str:
-    if size_bytes == 0:
-        return "0 B"
-    size_name = ("B", "KB", "MB", "GB", "TB")
-    i = int(math.floor(math.log(size_bytes, 1024)))
-    p = math.pow(1024, i)
-    s = round(float(size_bytes) / p, 1)
-    return f"{s} {size_name[i]}"
-
-
 class UnfoldCacheManager:
-    """Singleton storage for archive structures in Redis."""
+    """Archive indexes in Redis, one hash per resource.
 
-    _instance = None
+    Hash layout (key ``ckanext:unfold:index:<resource_id>``):
+
+    * ``meta``  - JSON ``{"total": n}``
+    * ``paths`` - all node ids joined with NUL, for search
+    * ``c:<parent id>`` - JSON list of that folder's children
+
+    Serving one folder is a single ``HGET``, whatever the archive size.
+    """
+
     _conn: redis.Redis | None = None
-    _PREFIX = "ckanext:unfold:tree:"
+    _PREFIX = "ckanext:unfold:index:"
+    _BATCH = 1000
 
     @classmethod
     def _ensure_conn(cls) -> redis.Redis:
@@ -133,35 +145,67 @@ class UnfoldCacheManager:
         return f"{cls._PREFIX}{resource_id}"
 
     @classmethod
-    def save(cls, nodes: list[unf_types.Node], resource_id: str) -> None:
-        """Save an archive structure to Redis."""
-        cls._conn = cls._ensure_conn()
+    def save(cls, index: ArchiveIndex, resource_id: str) -> None:
+        conn = cls._ensure_conn()
+        key = cls._key(resource_id)
 
-        data = json.dumps([asdict(n) for n in nodes])
-        cls._conn.setex(cls._key(resource_id), REDIS_CACHE_TTL, data)
+        mapping: dict[str, str] = {
+            "meta": json.dumps({"total": index.total}),
+            "paths": "\0".join(index.paths),
+        }
+
+        for parent, nodes in index.children.items():
+            mapping[f"c:{parent}"] = json.dumps([asdict(n) for n in nodes])
+
+        pipe = conn.pipeline()
+        pipe.delete(key)
+
+        items = list(mapping.items())
+        for start in range(0, len(items), cls._BATCH):
+            pipe.hset(key, mapping=dict(items[start : start + cls._BATCH]))
+
+        pipe.expire(key, REDIS_CACHE_TTL)
+        pipe.execute()
 
     @classmethod
-    def get(cls, resource_id: str) -> list[unf_types.Node]:
-        """Retrieve an archive structure from Redis."""
-        cls._conn = cls._ensure_conn()
+    def exists(cls, resource_id: str) -> bool:
+        return bool(cls._ensure_conn().hexists(cls._key(resource_id), "meta"))
 
-        data: bytes = cls._conn.get(cls._key(resource_id))  # type: ignore
+    @classmethod
+    def total(cls, resource_id: str) -> int:
+        raw = cls._ensure_conn().hget(cls._key(resource_id), "meta")
 
-        if not data:
-            return []
+        return json.loads(raw)["total"] if raw else 0  # type: ignore
 
-        raw = json.loads(data)
-        return [unf_types.Node(**n) for n in raw]
+    @classmethod
+    def children(cls, resource_id: str, parent: str) -> list[unf_types.Node]:
+        raw = cls._ensure_conn().hget(cls._key(resource_id), f"c:{parent}")
+
+        return [unf_types.Node(**n) for n in json.loads(raw)] if raw else []  # type: ignore
+
+    @classmethod
+    def all_nodes(cls, resource_id: str) -> list[unf_types.Node]:
+        data: dict[bytes, bytes] = cls._ensure_conn().hgetall(cls._key(resource_id))  # type: ignore
+        nodes: list[unf_types.Node] = []
+
+        for field, raw in data.items():
+            if field.startswith(b"c:"):
+                nodes.extend(unf_types.Node(**n) for n in json.loads(raw))
+
+        return nodes
+
+    @classmethod
+    def paths(cls, resource_id: str) -> list[str]:
+        raw: bytes | None = cls._ensure_conn().hget(cls._key(resource_id), "paths")  # type: ignore
+
+        return raw.decode().split("\0") if raw else []
 
     @classmethod
     def delete(cls, resource_id: str) -> None:
-        """Delete an archive structure from Redis."""
-        cls._conn = cls._ensure_conn()
-        cls._conn.delete(cls._key(resource_id))  # type: ignore
+        cls._ensure_conn().delete(cls._key(resource_id))
 
     @classmethod
     def close(cls) -> None:
-        """Close the shared Redis connection."""
         if not cls._conn:
             return
 
@@ -169,28 +213,99 @@ class UnfoldCacheManager:
         cls._conn = None
 
 
+class CachedIndex:
+    """Same interface as ``ArchiveIndex``, reading from Redis on demand."""
+
+    def __init__(self, resource_id: str) -> None:
+        self.resource_id = resource_id
+        self.total = UnfoldCacheManager.total(resource_id)
+
+    def children_of(self, parent: str) -> list[unf_types.Node]:
+        return UnfoldCacheManager.children(self.resource_id, parent)
+
+    def all_nodes(self) -> list[unf_types.Node]:
+        return UnfoldCacheManager.all_nodes(self.resource_id)
+
+    def search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> SearchResult:
+        paths = UnfoldCacheManager.paths(self.resource_id)
+        matched, matches = search_paths(paths, query, limit)
+
+        # matched nodes live in their parents' child lists: one HGET per parent
+        siblings: dict[str, dict[str, unf_types.Node]] = {}
+        nodes: list[unf_types.Node] = []
+
+        for path in matched:
+            parts = [p for p in path.split("/") if p]
+            parent = "/".join(parts[:-1]) or ROOT
+
+            if parent not in siblings:
+                siblings[parent] = {n.id: n for n in self.children_of(parent)}
+
+            node = siblings[parent].get(path)
+
+            if node is not None:
+                nodes.append(node)
+
+        return build_search_result(matched, matches, limit, nodes)
+
+
+def get_archive_index(
+    resource: dict[str, Any], resource_view: dict[str, Any]
+) -> ArchiveIndex | CachedIndex:
+    """Return the archive's folder index, building and caching it if needed."""
+    cache_enabled = unf_config.is_cache_enabled()
+
+    if cache_enabled and UnfoldCacheManager.exists(resource["id"]):
+        cached = CachedIndex(resource["id"])
+        log.info(
+            "Resource %s: serving %s entries from the Redis index",
+            resource["id"],
+            cached.total,
+        )
+        return cached
+
+    started = time.monotonic()
+    log.info(
+        "Building archive index for resource %s (%s, cache %s)",
+        resource["id"],
+        resource.get("url"),
+        "on" if cache_enabled else "off",
+    )
+
+    nodes = get_archive_tree(resource, resource_view)
+    log.info(
+        "Resource %s: adapter returned %s entries in %.1fs",
+        resource["id"],
+        len(nodes),
+        time.monotonic() - started,
+    )
+
+    index = ArchiveIndex.from_nodes(nodes)
+
+    if cache_enabled:
+        UnfoldCacheManager.save(index, resource["id"])
+
+    log.info(
+        "Resource %s: indexed %s entries in %.1fs total",
+        resource["id"],
+        index.total,
+        time.monotonic() - started,
+    )
+
+    return index
+
+
 def get_archive_tree(
     resource: dict[str, Any], resource_view: dict[str, Any]
 ) -> list[unf_types.Node]:
-    cache_enabled = unf_config.is_cache_enabled()
-
-    if cache_enabled:
-        cached_tree = UnfoldCacheManager.get(resource["id"])
-
-        if cached_tree:
-            return cached_tree
-
+    """Build the flat node list for a resource with the matching adapter."""
     adapter_cls = get_adapter_for_resource(resource)
+
     if adapter_cls is None:
         res_format = resource["format"].lower()
         raise unf_exception.UnfoldError(f"No adapter for `{res_format}` archives")
 
-    archive_tree = _build_archive_tree(adapter_cls, resource_view, resource)
-
-    if cache_enabled:
-        UnfoldCacheManager.save(archive_tree, resource["id"])
-
-    return archive_tree
+    return _build_archive_tree(adapter_cls, resource_view, resource)
 
 
 def _build_archive_tree(

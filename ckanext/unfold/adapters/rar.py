@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime as dt
 from io import BytesIO
 from typing import Any
 
@@ -15,6 +14,7 @@ import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.adapters.base import BaseAdapter
+from ckanext.unfold.formatting import datetime_from_dos
 
 log = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class RarAdapter(BaseAdapter):
 
         if not modified_at and isinstance(entry.date_time, tuple):
             modified_at = tk.h.render_datetime(
-                dt(*entry.date_time),  # type: ignore
+                datetime_from_dos(entry.date_time),
                 date_format=unf_utils.DEFAULT_DATE_FORMAT,
             )
 

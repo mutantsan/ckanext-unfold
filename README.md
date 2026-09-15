@@ -34,6 +34,37 @@ ckan.views.default_views = unfold_view
 
 See the [config declaration](./ckanext/unfold/config_declaration.yaml) file.
 
+## Large archives
+
+The listing is built once per resource and cached in Redis as a folder index
+(one hash per resource, one field per folder). How it reaches the browser
+depends on `ckanext.unfold.expand_nodes_threshold`:
+
+- **At most the threshold** (2000 entries by default): the whole tree is sent
+  in one request and shown expanded.
+- **Above it**: only the root folder is sent; each folder is requested when the
+  user opens it, `ckanext.unfold.page_size` entries at a time with a
+  "Show more" row for the rest. Search runs on the server and shows a flat
+  list of the first 200 matching paths, since matches may sit in folders that
+  are not loaded. The widget shows the total entry count and, for a search,
+  how many entries matched. "Expand all" is disabled for these archives.
+
+Remote ZIP archives are read through HTTP Range requests, so only the central
+directory is transferred. A multi-gigabyte ZIP referenced by URL previews in a
+few requests as long as the hosting server honours `Range`. Other formats are
+downloaded in full and are subject to `ckanext.unfold.max_file_size`.
+
+### API
+
+- `get_archive_structure` (`id`, optional `view_id`, `parent`, `limit`):
+  returns `{"mode": "full" | "lazy", "total": n, "nodes": [...]}`. In lazy
+  mode `nodes` are the first `limit` direct children of `parent` (default
+  `#`), with `children_total` and `has_more`. On failure returns
+  `{"error": "..."}`.
+- `search_archive_structure` (`id`, optional `view_id`, `q`, optional `limit`):
+  returns `{"results": [{id, text, icon, is_dir, size, modified_at}, ...],
+  "ids": [...folders to open...], "matches": n, "truncated": bool}`.
+
 ## Signals
 
 The extension provides the following signals for customization and extension:
@@ -51,6 +82,7 @@ We're providing a simple example adapter below. The node list generation is up t
 ```py
 from ckanext.unfold.adapters import BaseAdapter
 from ckanext.unfold.types import Node
+
 
 class ExampleAdapter(BaseAdapter):
     def get_node_list(self) -> list[Node]:
@@ -74,22 +106,37 @@ class ExampleAdapter(BaseAdapter):
                 text="example_file.txt",
                 icon="fa fa-file-text",
                 parent="example_folder/",
-                a_attr={"href": "http://example.com/example_file.txt", "target": "_blank"},
-                data={"type": "file", "size": "50 KB", "modified_at": "26/08/2021 - 20:13"},
+                a_attr={
+                    "href": "http://example.com/example_file.txt",
+                    "target": "_blank",
+                },
+                data={
+                    "type": "file",
+                    "size": "50 KB",
+                    "modified_at": "26/08/2021 - 20:13",
+                },
             ),
             unf_types.Node(
                 id="example_folder/example_file.pdf",
                 text="example_file.pdf",
                 icon="fa fa-file-pdf",
                 parent="example_folder/",
-                data={"type": "file", "size": "1.2 MB", "modified_at": "01/01/2024 - 00:00"},
+                data={
+                    "type": "file",
+                    "size": "1.2 MB",
+                    "modified_at": "01/01/2024 - 00:00",
+                },
             ),
             unf_types.Node(
                 id="another_file.docx",
                 text="another_file.docx",
                 icon="fa fa-file-word",
                 parent="#",
-                data={"type": "file", "size": "1.0 MB", "modified_at": "01/01/2024 - 00:00"},
+                data={
+                    "type": "file",
+                    "size": "1.0 MB",
+                    "modified_at": "01/01/2024 - 00:00",
+                },
             ),
         ]
 ```
@@ -131,6 +178,8 @@ Sometimes, you may want to provide a custom adapter for a specific resource base
 
 ```py
 ...
+
+
 class ExamplePlugin(p.SingletonPlugin):
     ...
 
@@ -145,7 +194,9 @@ class ExamplePlugin(p.SingletonPlugin):
         }
 
     @classmethod
-    def _get_adapter_for_resource(cls, resource: dict[str, str]) -> type[BaseAdapter] | None | bool:
+    def _get_adapter_for_resource(
+        cls, resource: dict[str, str]
+    ) -> type[BaseAdapter] | None | bool:
         if resource.get("format", "").lower() == "my.format":
             return ExampleAdapter
 

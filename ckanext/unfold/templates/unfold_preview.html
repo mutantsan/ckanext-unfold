@@ -1,29 +1,31 @@
 <div class="unfold-preview">
     <div class="ckanext-jstree-search">
         <div class="jstree-search--input">
-            <label class="d-none" for="field-sitewide-search">{{ _('Search') }}</label>
+            <label class="d-none" for="jstree-search">{{ _('Search') }}</label>
             <input id="jstree-search" class="form-control" type="text" name="jstree-search"
                 placeholder="{{ _('Search') }}" aria-label="{{ _('Search') }}" />
         </div>
 
-        <button class="btn btn-sm" type="submit" aria-label="{{ _('Search icon') }}"><i
+        <button class="btn btn-sm" type="button" id="jstree-search-run" title="{{ _('Search') }}" aria-label="{{ _('Search') }}"><i
                 class="fa fa-search"></i>
         </button>
 
-        <button class="btn btn-sm" id="jstree-search-clear" title="{{ _('Clear search') }}" aria-label="{{ _('Clear search') }}">
+        <button class="btn btn-sm" type="button" id="jstree-search-clear" title="{{ _('Clear search') }}" aria-label="{{ _('Clear search') }}">
             <i class="fa fa-close"></i>
         </button>
 
-        <button class="btn btn-sm" id="jstree-expand-all" title="{{ _('Expand all folders') }}" aria-label="{{ _('Expand all folders') }}">
+        <button class="btn btn-sm" type="button" id="jstree-expand-all" title="{{ _('Expand all folders') }}" aria-label="{{ _('Expand all folders') }}">
             <i class="fa fa-folder-open"></i>
         </button>
-        <button class="btn btn-sm" id="jstree-collapse-all" title="{{ _('Collapse all folders') }}" aria-label="{{ _('Collapse all folders') }}">
+        <button class="btn btn-sm" type="button" id="jstree-collapse-all" title="{{ _('Collapse all folders') }}" aria-label="{{ _('Collapse all folders') }}">
             <i class="fa fa-folder"></i>
         </button>
 
         <div class="unfold-load-state btn btn-sm">
-            <img src="{{ h.url_for_static('/spinner.gif') }}" width="20">
+            <img src="{{ h.url_for_static('/spinner.gif') }}" width="20" alt="{{ _('Loading') }}">
         </div>
+
+        <span class="unfold-tree-meta text-muted align-self-center" aria-live="polite"></span>
     </div>
 
     <div class="pseudo-table-header">
@@ -38,15 +40,18 @@
         </div>
     </div>
 
+    <div id="archive-search-results" class="unfold-search-results" style="display: none" aria-live="polite"></div>
+
     <div id="archive-tree" data-module="unfold-init-jstree"
         data-module-resource-id="{{ resource.id }}"
         data-module-resource-view-id="{{ resource_view.id }}"
+        data-module-page-size="{{ page_size }}"
         data-module-show-context-menu="{{ (show_context_menu_default if resource_view.show_context_menu is undefined else resource_view.show_context_menu) | tojson }}">
         <div id="archive-tree--loader" class="ms-4">
             {{ _("Loading ...") }}
         </div>
         <div id="archive-tree-error" class="fw-normal" style="display: none">
-            <img src="{{ h.url_for_static('/error.gif') }}" width="30">
+            <img src="{{ h.url_for_static('/error.gif') }}" width="30" alt="">
             <span></span>
         </div>
     </div>

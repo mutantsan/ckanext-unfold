@@ -53,12 +53,24 @@ ckan = ["ckan"]
 ckanext = ["ckanext"]
 self = ["ckanext.unfold"]
 
+[tool.ruff.lint.isort]
+section-order = [
+    "future",
+    "standard-library",
+    "first-party",
+    "third-party",
+    "ckan",
+    "ckanext",
+    "self",
+    "local-folder",
+]
+
 [tool.pytest.ini_options]
 addopts = "--ckan-ini test.ini"
 filterwarnings = [
-               "ignore::sqlalchemy.exc.SADeprecationWarning",
-               "ignore::sqlalchemy.exc.SAWarning",
-               "ignore::DeprecationWarning",
+    "ignore::sqlalchemy.exc.SADeprecationWarning",
+    "ignore::sqlalchemy.exc.SAWarning",
+    "ignore::DeprecationWarning",
 ]
 
 [tool.pyright]
@@ -67,6 +79,9 @@ include = ["ckanext"]
 exclude = [
     "**/test*",
     "**/migration",
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*"
 ]
 strict = []
 

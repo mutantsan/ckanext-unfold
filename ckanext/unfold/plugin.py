@@ -7,8 +7,8 @@ import ckan.plugins.toolkit as tk
 from ckan import types
 from ckan.common import CKANConfig
 
-import ckanext.unfold.utils as unf_utils
 import ckanext.unfold.config as unf_config
+import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.adapters import adapter_registry
 from ckanext.unfold.logic.schema import get_preview_schema
 
@@ -62,6 +62,7 @@ class UnfoldPlugin(p.SingletonPlugin):
     ) -> dict[str, Any]:
         return {
             "show_context_menu_default": unf_config.get_context_menu_default(),
+            "page_size": unf_config.get_page_size(),
         }
 
     # IResourceController

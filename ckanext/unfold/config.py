@@ -4,6 +4,7 @@ CONF_CACHE_ENABLE = "ckanext.unfold.enable_cache"
 CONF_MAX_FILE_SIZE = "ckanext.unfold.max_file_size"
 CONF_EXPAND_NODES_THRESHOLD = "ckanext.unfold.expand_nodes_threshold"
 CONF_CONTEXT_MENU = "ckanext.unfold.show_context_menu_default"
+CONF_PAGE_SIZE = "ckanext.unfold.page_size"
 
 
 def is_cache_enabled() -> bool:
@@ -23,3 +24,8 @@ def get_expand_nodes_threshold() -> int:
 def get_context_menu_default() -> bool:
     """Get the default setting for showing context menu in the UI tree view."""
     return tk.config[CONF_CONTEXT_MENU]
+
+
+def get_page_size() -> int:
+    """Number of children of one folder sent per request for large archives."""
+    return tk.config[CONF_PAGE_SIZE]

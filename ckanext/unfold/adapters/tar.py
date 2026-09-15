@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime as dt
 from io import BytesIO
-from tarfile import TarError, TarInfo, open as tar_open
+from tarfile import TarError, TarInfo
+from tarfile import open as tar_open
 from typing import Any, Literal
-
 
 import ckan.plugins.toolkit as tk
 
@@ -13,6 +12,7 @@ import ckanext.unfold.exception as unf_exception
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
 from ckanext.unfold.adapters.base import BaseAdapter
+from ckanext.unfold.formatting import datetime_from_timestamp
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +44,8 @@ class TarAdapter(BaseAdapter):
 
     def _prepare_table_data(self, entry: TarInfo) -> dict[str, Any]:
         modified_at = tk.h.render_datetime(
-            dt.fromtimestamp(entry.mtime), date_format=unf_utils.DEFAULT_DATE_FORMAT
+            datetime_from_timestamp(entry.mtime),
+            date_format=unf_utils.DEFAULT_DATE_FORMAT,
         )
 
         return {
