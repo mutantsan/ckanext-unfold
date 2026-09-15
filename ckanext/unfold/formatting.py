@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
 
 SIZE_UNITS = ("B", "KB", "MB", "GB", "TB", "PB")
 
@@ -31,7 +32,7 @@ def datetime_from_dos(parts: Sequence[int] | None) -> datetime | None:
         return None
 
     try:
-        return datetime(*parts[:6], tzinfo=UTC)
+        return datetime(*parts[:6], tzinfo=timezone.utc)
     except (TypeError, ValueError, OverflowError):
         return None
 
@@ -42,6 +43,6 @@ def datetime_from_timestamp(timestamp: float | None) -> datetime | None:
         return None
 
     try:
-        return datetime.fromtimestamp(timestamp, tz=UTC)
+        return datetime.fromtimestamp(timestamp, tz=timezone.utc)
     except (TypeError, ValueError, OverflowError, OSError):
         return None

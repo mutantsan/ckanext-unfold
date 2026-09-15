@@ -1,73 +1,29 @@
+"""Adapter-level tests: every format over a mocked HTTP server."""
+
 import io
-import os
 import re
 import zipfile
 
+import py7zr
 import pytest
+import rarfile
 
-from ckanext.unfold import exception, types, utils
-from ckanext.unfold.adapters import base, remote
+from ckanext.unfold import exception, utils
+from ckanext.unfold.adapters import remote
+from ckanext.unfold.adapters.zip import ZipAdapter
+from ckanext.unfold.tests import snapshots
+from ckanext.unfold.tests.helpers import (
+    BASE_URL,
+    FORMAT_NODE_COUNTS,
+    assert_valid_tree,
+    build_tree,
+    range_rejecting_response,
+    range_response,
+    read_fixture,
+    summarize,
+)
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-BASE_URL = "http://archives.test/"
 ZIP64_ENTRIES = 65_536  # zipfile switches to ZIP64 records above 65,535 entries
-
-
-def _range_response(data: bytes):
-    """Build a requests_mock callback that serves ``data`` with Range support.
-
-    Honors ``bytes=a-b``, ``bytes=a-`` and suffix ``bytes=-n`` requests so the
-    ZIP tail fast-path (206 + Content-Range) is exercised; a request without a
-    Range falls back to a full 200 response.
-    """
-    size = len(data)
-
-    def _callback(request, context):
-        match = re.fullmatch(r"bytes=(\d*)-(\d*)", request.headers.get("Range", ""))
-
-        if not match or match.group(1) == match.group(2) == "":
-            context.status_code = 200
-            context.headers["Content-Length"] = str(size)
-            return data
-
-        first, last = match.group(1), match.group(2)
-
-        if first == "":
-            start, end = max(0, size - int(last)), size - 1
-        else:
-            start = int(first)
-            end = min(int(last), size - 1) if last else size - 1
-
-        chunk = data[start : end + 1]
-        context.status_code = 206
-        context.headers["Content-Range"] = f"bytes {start}-{end}/{size}"
-        context.headers["Content-Length"] = str(len(chunk))
-
-        return chunk
-
-    return _callback
-
-
-def _range_rejecting_response(data: bytes):
-    """Build a callback that rejects any Range request with 416.
-
-    Mimics servers (e.g. some Werkzeug-served downloads) that reply
-    ``416 Requested Range Not Satisfiable`` to a suffix range larger than the
-    file instead of returning the whole file. A request without a Range gets a
-    full 200 response.
-    """
-    size = len(data)
-
-    def _callback(request, context):
-        if request.headers.get("Range"):
-            context.status_code = 416
-            return b""
-
-        context.status_code = 200
-        context.headers["Content-Length"] = str(size)
-        return data
-
-    return _callback
 
 
 @pytest.fixture
@@ -79,11 +35,21 @@ def archive_url(requests_mock):
     """
 
     def register(name: str) -> str:
-        with open(os.path.join(DATA_DIR, name), "rb") as fp:
-            data = fp.read()
-
         url = BASE_URL + name
-        requests_mock.get(url, content=_range_response(data))
+        requests_mock.get(url, content=range_response(read_fixture(name)))
+
+        return url
+
+    return register
+
+
+@pytest.fixture
+def serve(requests_mock):
+    """Serve arbitrary bytes under a name and return the URL."""
+
+    def register(name: str, data: bytes) -> str:
+        url = BASE_URL + name
+        requests_mock.get(url, content=range_response(data))
 
         return url
 
@@ -91,97 +57,286 @@ def archive_url(requests_mock):
 
 
 @pytest.mark.usefixtures("with_request_context")
-@pytest.mark.parametrize(
-    ("file_format", "num_nodes"),
-    [
-        ("rar", 13),
-        ("cbr", 38),
-        ("7z", 5),
-        ("zip", 11),
-        ("zipx", 4),
-        ("jar", 76),
-        ("tar", 5),
-        ("tar.gz", 1),
-        ("tar.xz", 1),
-        ("tar.bz2", 1),
-        ("rpm", 355),
-        ("deb", 3),
-        ("ar", 1),
-        ("a", 2),
-        ("lib", 2),
-    ],
-)
+@pytest.mark.parametrize(("file_format", "num_nodes"), FORMAT_NODE_COUNTS.items())
 def test_build_tree(archive_url, file_format: str, num_nodes: int):
-    url = archive_url(f"test_archive.{file_format}")
+    tree = build_tree(file_format, archive_url(f"test_archive.{file_format}"))
 
-    adapter = utils.get_adapter_for_resource({"format": file_format})
-    adapter_instance = adapter({}, {}, filepath=url)  # type: ignore
-    tree = adapter_instance.build_archive_tree()
+    assert_valid_tree(tree)
+    assert len(tree) == num_nodes
+
+
+@pytest.mark.usefixtures("with_request_context")
+@pytest.mark.parametrize("file_format", snapshots.NODES)
+def test_listing_matches_snapshot(archive_url, file_format: str):
+    """Ids, parents, icons, sizes and dates of every small fixture, per format."""
+    tree = build_tree(file_format, archive_url(f"test_archive.{file_format}"))
+
+    assert summarize(tree) == snapshots.NODES[file_format]
+
+
+@pytest.mark.usefixtures("with_request_context")
+@pytest.mark.parametrize(("file_format", "num_nodes"), [("rar", 13), ("cbr", 38)])
+def test_rar_listing_needs_no_external_tool(
+    archive_url, monkeypatch, file_format: str, num_nodes: int
+):
+    """rarfile parses RAR3 and RAR5 headers itself; unrar, unar and bsdtar
+    are only consulted to extract compressed entries.
+
+    CI installs none of them, so the adapter must never reach for one.
+    """
+
+    def no_tool(*args, **kwargs):
+        raise rarfile.RarCannotExec("Cannot find working tool")
+
+    monkeypatch.setattr(rarfile, "tool_setup", no_tool)
+
+    tree = build_tree(file_format, archive_url(f"test_archive.{file_format}"))
 
     assert len(tree) == num_nodes
-    assert isinstance(tree[0], types.Node)
+
+
+@pytest.mark.usefixtures("with_request_context")
+def test_build_complex_tree(archive_url):
+    tree = build_tree("zip", archive_url("test_complex_nested.zip"))
+
+    assert_valid_tree(tree)
+    assert len(tree) == 15004
+    assert len([node for node in tree if node.parent == "#"]) == 4
+
+
+# --- corrupt input -----------------------------------------------------------
+
+
+def _corrupt_cases():
+    """(format, body) for a truncated, a garbage and an empty body per format."""
+    for fmt in FORMAT_NODE_COUNTS:
+        data = read_fixture(f"test_archive.{fmt}")
+        bodies = {
+            "half": data[: len(data) // 2],
+            "garbage": b"\x00garbage" * 100,
+            "empty": b"",
+        }
+
+        for label, body in bodies.items():
+            yield pytest.param(fmt, body, id=f"{fmt}-{label}")
+
+
+@pytest.mark.usefixtures("with_request_context")
+@pytest.mark.parametrize(("file_format", "body"), _corrupt_cases())
+def test_corrupt_input_is_reported_or_listed(serve, file_format: str, body: bytes):
+    """A damaged archive either lists what is readable or raises UnfoldError.
+
+    Whatever happens, the caller must never see a raw library exception,
+    because only ``UnfoldError`` reaches the user as a message. Truncated
+    gzip and xz tars (``EOFError``) and corrupt rpms (``RPMError``,
+    ``struct.error``) are the cases that rely on the generic wrapper.
+    """
+    url = serve(f"broken.{file_format}", body)
+
+    try:
+        tree = build_tree(file_format, url)
+    except exception.UnfoldError as e:
+        assert str(e).startswith("Error"), str(e)
+    else:
+        if tree:
+            assert_valid_tree(tree)
+
+
+# --- passwords ---------------------------------------------------------------
+
+
+@pytest.mark.usefixtures("with_request_context")
+def test_password_protected_zip_lists_without_password(archive_url):
+    """Zip encrypts entry data, not names, so the listing needs no password."""
+    tree = build_tree("zip", archive_url("test_archive_pass.zip"))
+
+    assert_valid_tree(tree)
+    assert len(tree) == 13
+
+
+def _encrypted_7z(header_encryption: bool) -> bytes:
+    buf = io.BytesIO()
+
+    with py7zr.SevenZipFile(
+        buf,
+        "w",
+        password="secret",  # noqa: S106
+        header_encryption=header_encryption,
+    ) as archive:
+        archive.writestr(b"hello", "dir/hello.txt")
+
+    return buf.getvalue()
+
+
+@pytest.mark.usefixtures("with_request_context")
+def test_7z_with_encrypted_entries_is_rejected_with_a_message(serve):
+    url = serve("secret.7z", _encrypted_7z(header_encryption=False))
+
+    with pytest.raises(exception.UnfoldError, match="protected with password"):
+        build_tree("7z", url)
+
+
+@pytest.mark.usefixtures("with_request_context")
+def test_7z_with_encrypted_headers_is_rejected_with_a_message(serve):
+    url = serve("secret-headers.7z", _encrypted_7z(header_encryption=True))
+
+    with pytest.raises(exception.UnfoldError, match="protected with password"):
+        build_tree("7z", url)
+
+
+class ExplodingAdapter(ZipAdapter):
+    def get_node_list(self):
+        raise RuntimeError("library internals")
+
+
+@pytest.mark.usefixtures("with_request_context")
+def test_unexpected_library_errors_become_unfold_errors(caplog):
+    resource = {"id": "res-boom", "format": "zip", "url": BASE_URL + "boom.zip"}
+
+    with (
+        caplog.at_level("ERROR", logger="ckanext.unfold.adapters.base"),
+        pytest.raises(
+            exception.UnfoldError, match="Could not read the archive"
+        ) as info,
+    ):
+        ExplodingAdapter(resource, {}).build_archive_tree()
+
+    assert isinstance(info.value.__cause__, RuntimeError)
+    assert "res-boom" in caplog.text
+    assert "RuntimeError: library internals" in caplog.text
+
+
+# --- resource metadata -------------------------------------------------------
+
+
+def test_tabledesigner_resources_are_rejected():
+    resource = {"format": "zip", "url": BASE_URL + "x", "type": "tabledesigner"}
+
+    with pytest.raises(exception.UnfoldError, match="Table Designer"):
+        ZipAdapter(resource, {})
+
+
+@pytest.mark.ckan_config("ckanext.unfold.max_file_size", 1024)
+@pytest.mark.usefixtures("with_request_context")
+def test_declared_size_over_limit_is_rejected_before_download(requests_mock):
+    """Formats that need the whole file trust the resource's size first."""
+    url = BASE_URL + "big.tar"
+    requests_mock.get(url, content=b"")
+
+    resource = {"format": "tar", "url": url, "size": "2048"}
+    adapter = utils.get_adapter_for_resource(resource)
+    assert adapter is not None
+
+    with pytest.raises(exception.UnfoldError, match="exceeds maximum allowed"):
+        adapter(resource, {}).build_archive_tree()
+
+    assert requests_mock.call_count == 0
+
+
+@pytest.mark.ckan_config("ckanext.unfold.max_file_size", 1024)
+@pytest.mark.usefixtures("with_request_context")
+def test_unparsable_declared_size_is_ignored(archive_url):
+    url = archive_url("test_archive.deb")
+    resource = {"format": "deb", "url": url, "size": "unknown"}
+    adapter = utils.get_adapter_for_resource(resource)
+    assert adapter is not None
+
+    # the deb fixture is 1.4 MB, so the download itself hits the limit:
+    # the declared size was ignored, not the limit
+    with pytest.raises(exception.UnfoldError, match="exceeds maximum allowed"):
+        adapter(resource, {}).build_archive_tree()
+
+
+@pytest.mark.ckan_config("ckanext.unfold.max_file_size", 1024)
+@pytest.mark.usefixtures("with_request_context")
+def test_full_download_rejects_advertised_content_length(requests_mock):
+    url = BASE_URL + "big.tar"
+    requests_mock.get(url, content=b"x" * 2048, headers={"Content-Length": "2048"})
+
+    with pytest.raises(exception.UnfoldError, match="exceeds maximum allowed"):
+        build_tree("tar", url)
+
+
+@pytest.mark.ckan_config("ckanext.unfold.max_file_size", 1024)
+@pytest.mark.usefixtures("with_request_context")
+def test_full_download_aborts_stream_without_content_length(requests_mock):
+    url = BASE_URL + "big.tar"
+    # no Content-Length header: only the streaming guard can catch it
+    requests_mock.get(url, content=b"x" * 2048)
+
+    with pytest.raises(exception.UnfoldError, match="exceeds maximum allowed"):
+        build_tree("tar", url)
+
+
+@pytest.mark.usefixtures("with_request_context")
+def test_http_error_becomes_unfold_error(requests_mock):
+    url = BASE_URL + "missing.tar"
+    requests_mock.get(url, status_code=404)
+
+    with pytest.raises(exception.UnfoldError, match="Error fetching archive"):
+        build_tree("tar", url)
+
+
+# --- zip: reading only the central directory ---------------------------------
 
 
 @pytest.mark.usefixtures("with_request_context")
 def test_zip_falls_back_to_full_download_on_416(requests_mock):
     """A server that 416s the suffix-range request still builds the tree."""
-    with open(os.path.join(DATA_DIR, "test_archive.zip"), "rb") as fp:
-        data = fp.read()
-
     url = BASE_URL + "test_archive.zip"
-    requests_mock.get(url, content=_range_rejecting_response(data))
+    requests_mock.get(
+        url, content=range_rejecting_response(read_fixture("test_archive.zip"))
+    )
 
-    adapter = utils.get_adapter_for_resource({"format": "zip"})
-    adapter_instance = adapter({}, {}, filepath=url)  # type: ignore
-    tree = adapter_instance.build_archive_tree()
+    tree = build_tree("zip", url)
 
+    assert_valid_tree(tree)
     assert len(tree) == 11
-    assert isinstance(tree[0], types.Node)
+
+
+def _zip_with_long_names(entries: int, name_length: int = 150) -> bytes:
+    buf = io.BytesIO()
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as archive:
+        for i in range(entries):
+            archive.writestr(f"dir{i % 10}/{'n' * name_length}{i}", b"x")
+
+    return buf.getvalue()
 
 
 @pytest.mark.usefixtures("with_request_context")
-def test_zip_reads_local_upload_from_storage(monkeypatch):
-    """A locally uploaded archive is read via CKAN storage, not over HTTP."""
-    with open(os.path.join(DATA_DIR, "test_archive.zip"), "rb") as fp:
-        data = fp.read()
+def test_zip_directory_larger_than_one_block_is_fetched_on_demand(requests_mock):
+    """The first request grabs the tail block; a directory that starts before
+    it is fetched with one more forward Range request, not a full download."""
+    data = _zip_with_long_names(2000)
+    assert len(data) > 2 * remote.BLOCK_SIZE
 
-    class FakeStorage:
-        def content(self, file_data):
-            return data
+    url = BASE_URL + "wide.zip"
+    requests_mock.get(url, content=range_response(data))
 
-    class FakeUploader:
-        storage = FakeStorage()
+    tree = build_tree("zip", url)
 
-        def get_path(self, id):
-            return "resource/location"
+    assert_valid_tree(tree)
+    assert len(tree) == 2010  # 2000 files + 10 inferred folders
 
-    monkeypatch.setattr(
-        base.uploader, "get_resource_uploader", lambda resource: FakeUploader()
-    )
-
-    resource = {
-        "id": "res-id",
-        "format": "zip",
-        "url_type": "upload",
-        "size": str(len(data)),
-    }
-    adapter = utils.get_adapter_for_resource(resource)
-    tree = adapter(resource, {}).build_archive_tree()  # type: ignore
-
-    assert len(tree) == 11
-    assert isinstance(tree[0], types.Node)
+    ranges = [r.headers["Range"] for r in requests_mock.request_history]
+    assert ranges[0] == f"bytes=-{remote.BLOCK_SIZE}"
+    assert len(ranges) == 2
+    assert re.fullmatch(r"bytes=\d+-\d+", ranges[1])
 
 
-def test_build_complex_tree(archive_url):
-    url = archive_url("test_complex_nested.zip")
+@pytest.mark.usefixtures("with_request_context")
+def test_zip_smaller_than_one_block_needs_a_single_request(requests_mock):
+    data = _zip_with_long_names(500)
+    assert len(data) < remote.BLOCK_SIZE
 
-    adapter = utils.get_adapter_for_resource({"format": "zip"})
-    adapter_instance = adapter({}, {}, filepath=url)  # type: ignore
-    tree = adapter_instance.build_archive_tree()
+    url = BASE_URL + "narrow.zip"
+    requests_mock.get(url, content=range_response(data))
 
-    assert len(tree) == 15004
-    root_folders = [node for node in tree if node.parent == "#"]
-    assert len(root_folders) == 4
+    tree = build_tree("zip", url)
+
+    assert len(tree) == 510
+    assert requests_mock.call_count == 1
 
 
 def _zip64_archive(entries: int = ZIP64_ENTRIES, payload: bytes = b"x" * 200) -> bytes:
@@ -222,11 +377,12 @@ def test_zip64_remote_reads_only_the_central_directory(requests_mock):
     """
     data = _zip64_archive()
     url = BASE_URL + "big.zip"
-    requests_mock.get(url, content=_range_response(data))
+    requests_mock.get(url, content=range_response(data))
 
     resource = {"format": "zip", "url": url, "size": str(95 * 1024**3)}
     adapter = utils.get_adapter_for_resource(resource)
-    tree = adapter(resource, {}).build_archive_tree()  # type: ignore
+    assert adapter is not None
+    tree = adapter(resource, {}).build_archive_tree()
 
     assert len(tree) == ZIP64_ENTRIES
     assert all(node.parent == "#" for node in tree)
@@ -243,32 +399,24 @@ def test_zip_limit_applies_to_bytes_transferred(requests_mock, archive_url):
     # ~3.3 MB directory exceeds a 1 MB limit even though only the tail is read
     data = _zip64_archive()
     url = BASE_URL + "big.zip"
-    requests_mock.get(url, content=_range_response(data))
-
-    resource = {"format": "zip", "url": url}
-    adapter = utils.get_adapter_for_resource(resource)
+    requests_mock.get(url, content=range_response(data))
 
     with pytest.raises(exception.UnfoldError, match="exceeds maximum allowed"):
-        adapter(resource, {}).build_archive_tree()  # type: ignore
+        build_tree("zip", url)
 
     # a small archive is unaffected by the same limit
-    small_url = archive_url("test_archive.zip")
-    small = {"format": "zip", "url": small_url}
-    tree = adapter(small, {}).build_archive_tree()  # type: ignore
+    tree = build_tree("zip", archive_url("test_archive.zip"))
     assert len(tree) == 11
 
 
 @pytest.mark.usefixtures("with_request_context")
 def test_zip_server_ignoring_range_falls_back_to_full_body(requests_mock):
     """A plain 200 answer (Range ignored) is parsed as the whole file."""
-    with open(os.path.join(DATA_DIR, "test_archive.zip"), "rb") as fp:
-        data = fp.read()
-
+    data = read_fixture("test_archive.zip")
     url = BASE_URL + "test_archive.zip"
     requests_mock.get(url, content=data, headers={"Content-Length": str(len(data))})
 
-    adapter = utils.get_adapter_for_resource({"format": "zip"})
-    tree = adapter({}, {}, filepath=url).build_archive_tree()  # type: ignore
+    tree = build_tree("zip", url)
 
     assert len(tree) == 11
 
@@ -277,23 +425,32 @@ def test_zip_server_ignoring_range_falls_back_to_full_body(requests_mock):
 @pytest.mark.usefixtures("with_request_context")
 def test_zip_server_ignoring_range_is_capped(requests_mock):
     """Without Range support the whole body counts against the limit."""
-    with open(os.path.join(DATA_DIR, "test_archive.zip"), "rb") as fp:
-        data = fp.read()
-
     url = BASE_URL + "test_archive.zip"
     # no Content-Length: the streaming guard must catch it
-    requests_mock.get(url, content=data)
-
-    adapter = utils.get_adapter_for_resource({"format": "zip"})
+    requests_mock.get(url, content=read_fixture("test_archive.zip"))
 
     with pytest.raises(exception.UnfoldError, match="exceeds maximum allowed"):
-        adapter({}, {}, filepath=url).build_archive_tree()  # type: ignore
+        build_tree("zip", url)
+
+
+def test_ensure_dir_entries_infers_missing_folders():
+    entries = [
+        zipfile.ZipInfo("a/b/c.txt"),
+        zipfile.ZipInfo("a/d.txt"),
+        zipfile.ZipInfo("e/"),
+    ]
+
+    result = ZipAdapter.ensure_dir_entries(ZipAdapter, entries)  # type: ignore[arg-type]
+    names = {zi.filename for zi in result}
+
+    assert names == {"a/b/c.txt", "a/d.txt", "e/", "a/", "a/b/"}
+    assert all(zi.is_dir() for zi in result if zi.filename in ("a/", "a/b/"))
 
 
 def test_remote_range_file_reads_across_blocks(requests_mock):
     data = bytes(range(256)) * 40  # 10,240 bytes
     url = BASE_URL + "blob"
-    requests_mock.get(url, content=_range_response(data))
+    requests_mock.get(url, content=range_response(data))
 
     remote_file = remote.RemoteRangeFile(
         url, len(data), max_bytes=len(data), block_size=4096

@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
-from ckan.lib import files, uploader
+from ckan.lib import uploader
+
+try:
+    # CKAN >= 2.12 only: the file-keeper storage layer core absorbed from
+    # ckanext-files. Older CKAN's uploaders never set `storage` (see
+    # `_read_upload`), so the module is simply unused when it is missing.
+    from ckan.lib import files
+except ImportError:  # CKAN < 2.12
+    files = None  # type: ignore[assignment]
 
 import ckanext.unfold.config as unf_config
 import ckanext.unfold.exception as unf_exception
@@ -59,7 +68,21 @@ class BaseAdapter:
         if not self.reads_partially:
             self.validate_size_limit()
 
-        return self.get_node_list()
+        try:
+            return self.get_node_list()
+        except unf_exception.UnfoldError:
+            raise
+        except Exception as e:
+            # Archive libraries raise their own errors (and plain ValueError,
+            # struct.error, EOFError...) on damaged input. Only UnfoldError
+            # reaches the user as a message; anything else would be a 500.
+            log.exception(
+                "Resource %s: could not read %s archive %s",
+                self.resource.get("id"),
+                self.resource.get("format"),
+                self.filepath,
+            )
+            raise unf_exception.UnfoldError("Error. Could not read the archive") from e
 
     def validate_size_limit(self) -> None:
         archive_size = self.resource.get("size")
@@ -101,20 +124,77 @@ class BaseAdapter:
         )
 
     def _read_upload(self) -> bytes:
-        """Read a locally uploaded resource's bytes via CKAN storage.
+        """Read an uploaded resource's bytes through whatever uploader serves it.
+
+        CKAN 2.12's file-keeper uploader exposes a ``storage``; the legacy
+        ``ResourceUpload`` and extensions such as ckanext-cloudstorage or
+        ckanext-s3filestore only offer ``get_path``, which may name a local
+        file or a key in a remote bucket. Each shape is tried in turn, ending
+        with a plain download of the resource URL for uploaders that keep
+        files elsewhere.
 
         The size is already enforced up front against the resource metadata in
-        ``validate_size_limit``.
+        ``validate_size_limit``; the download fallback enforces it again.
         """
         upload = uploader.get_resource_uploader(self.resource)
-        location = upload.get_path(self.resource["id"])
+        resource_id = self.resource["id"]
+        # `files` (and thus a `storage` attribute) only exists on CKAN >= 2.12
+        storage = getattr(upload, "storage", None) if files is not None else None
+
+        if storage is not None:
+            try:
+                return storage.content(files.FileData(upload.get_path(resource_id)))
+            except files.exc.FilesError as e:
+                raise unf_exception.UnfoldError(
+                    f"Error reading uploaded archive: {e}"
+                ) from e
+
+        path = self._local_upload_path(upload)
+
+        if path is not None:
+            try:
+                with open(path, "rb") as fp:
+                    return fp.read()
+            except OSError as e:
+                raise unf_exception.UnfoldError(
+                    f"Error reading uploaded archive: {e}"
+                ) from e
+
+        log.info(
+            "Resource %s: uploader %s offers neither a storage nor a local file;"
+            " downloading %s",
+            resource_id,
+            type(upload).__name__,
+            self.filepath,
+        )
+        return remote.fetch_full(
+            self.filepath, unf_config.get_max_file_size(), DEFAULT_TIMEOUT
+        )
+
+    def _local_upload_path(self, upload: Any) -> str | None:
+        """Absolute path of the uploaded file, if the uploader keeps it on disk."""
+        get_path = getattr(upload, "get_path", None)
+
+        if get_path is None:
+            return None
 
         try:
-            return upload.storage.content(files.FileData(location))
-        except files.exc.FilesError as e:
-            raise unf_exception.UnfoldError(
-                f"Error reading uploaded archive: {e}"
-            ) from e
+            path = get_path(self.resource["id"])
+        except Exception:
+            # ResourceUpload raises TypeError without a storage path and
+            # ValidationError for ids it cannot map; neither is fatal here
+            log.debug(
+                "Resource %s: %s.get_path failed",
+                self.resource["id"],
+                type(upload).__name__,
+                exc_info=True,
+            )
+            return None
+
+        if isinstance(path, str) and os.path.isabs(path) and os.path.isfile(path):
+            return path
+
+        return None
 
     @staticmethod
     def _content_length(content_length: str | None) -> int | None:

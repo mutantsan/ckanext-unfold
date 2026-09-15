@@ -17,9 +17,9 @@ Features:
 
 ## Requirements
 
-CKAN >= 2.12
+CKAN >= 2.11
 
-Python >= 3.11
+Python >= 3.10
 
 Redis (for caching)
 

@@ -22,6 +22,12 @@ class SevenZipAdapter(BaseAdapter):
     def get_node_list(self) -> list[unf_types.Node]:
         try:
             file_list = self.get_file_list_from_url(self.filepath)
+        except exceptions.PasswordRequired as e:
+            # raised on open when the header itself is encrypted; not an
+            # ArchiveError subclass
+            raise unf_exception.UnfoldError(
+                "Error. Archive is protected with password"
+            ) from e
         except exceptions.ArchiveError as e:
             raise unf_exception.UnfoldError(f"Error opening archive: {e}") from e
         except requests.RequestException as e:

@@ -1,6 +1,6 @@
 """Tests for the CKAN-free formatting helpers."""
 
-from datetime import UTC
+from datetime import timezone
 
 from ckanext.unfold import formatting
 
@@ -18,7 +18,7 @@ def test_datetime_from_dos_valid_tuple():
 
     assert value is not None
     assert (value.year, value.month, value.day) == (2022, 11, 10)
-    assert value.tzinfo is UTC
+    assert value.tzinfo is timezone.utc
     assert value.strftime("%d/%m/%Y - %H:%M") == "10/11/2022 - 00:45"
 
 

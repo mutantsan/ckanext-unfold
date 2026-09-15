@@ -1,23 +1,48 @@
 name: Tests
 on: [push, pull_request]
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.14"
+    - name: Install ruff
+      run: pip install ruff
+    - name: Ruff
+      run: ruff check ckanext
+
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # ckan/ckan-dev publishes one Python build per CKAN release; the
+        # Solr tag carries its own major version suffix.
+        include:
+          - ckan-version: "2.12"
+            python-version: "3.14"
+            solr-version: "2.12-solr9"
+          - ckan-version: "2.11"
+            python-version: "3.10"
+            solr-version: "2.11-solr9"
+
     runs-on: ubuntu-latest
     container:
-      image: ckan/ckan-dev:2.10-py3.10
+      image: ckan/ckan-dev:${{ matrix.ckan-version }}-py${{ matrix.python-version }}
       options: --user root
     services:
       solr:
-        image: ckan/ckan-solr:2.10
+        image: ckan/ckan-solr:${{ matrix.solr-version }}
       postgres:
-        image: ckan/ckan-postgres-dev:2.10
+        image: ckan/ckan-postgres-dev:${{ matrix.ckan-version }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
       redis:
-          image: redis:3
+        image: redis:7
     env:
       CKAN_SQLALCHEMY_URL: postgresql://ckan_default:pass@postgres/ckan_test
       CKAN_DATASTORE_WRITE_URL: postgresql://datastore_write:pass@postgres/datastore_test
@@ -31,7 +56,14 @@ jobs:
       # Install any extra requirements your extension has here (dev requirements, other extensions etc)
       run: |
         pip install --upgrade pip
-        pip install -e '.[dev]'
+        pip install -e '.[dev]' pyright
+    - name: Pyright
+      # runs here rather than in the lint job because it needs CKAN importable.
+      # Only against the primary target: `ckan.lib.files` genuinely does not
+      # exist on 2.11, so pyright can't resolve it there even behind the
+      # try/except that makes it optional at runtime.
+      if: matrix.ckan-version == '2.12'
+      run: pyright
     - name: Setup extension
       # Extra initialization steps
       run: |
