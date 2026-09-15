@@ -42,19 +42,22 @@
 
     <div id="archive-search-results" class="unfold-search-results" style="display: none" aria-live="polite"></div>
 
+    {# Both blocks must stay outside #archive-tree: jstree replaces the
+       container's content when it initialises. #}
+    <div id="archive-tree--loader" class="ms-4">
+        {{ _("Loading ...") }}
+    </div>
+    <div id="archive-tree-error" class="fw-normal mb-3" role="alert" style="display: none">
+        <img src="{{ h.url_for_static('/error.gif') }}" width="30" alt="">
+        <span class="unfold-error-message"></span>
+        <button class="btn btn-sm" type="button" id="archive-tree-retry" style="display: none">{{ _("Retry") }}</button>
+    </div>
+
     <div id="archive-tree" data-module="unfold-init-jstree"
         data-module-resource-id="{{ resource.id }}"
         data-module-resource-view-id="{{ resource_view.id }}"
         data-module-page-size="{{ page_size }}"
-        data-module-show-context-menu="{{ (show_context_menu_default if resource_view.show_context_menu is undefined else resource_view.show_context_menu) | tojson }}">
-        <div id="archive-tree--loader" class="ms-4">
-            {{ _("Loading ...") }}
-        </div>
-        <div id="archive-tree-error" class="fw-normal" style="display: none">
-            <img src="{{ h.url_for_static('/error.gif') }}" width="30" alt="">
-            <span></span>
-        </div>
-    </div>
+        data-module-show-context-menu="{{ (show_context_menu_default if resource_view.show_context_menu is undefined else resource_view.show_context_menu) | tojson }}"></div>
 </div>
 
 {% asset 'unfold/unfold-js' %}

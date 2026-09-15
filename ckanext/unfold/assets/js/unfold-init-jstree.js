@@ -16,7 +16,12 @@ ckan.module("unfold-init-jstree", function ($, _) {
             $.proxyAll(this, /_/);
 
             this.tree = $(this.el);
+            this.loader = $("#archive-tree--loader");
             this.errorBlock = $("#archive-tree-error");
+            this.errorMessage = this.errorBlock.find(".unfold-error-message");
+            this.retryButton = $("#archive-tree-retry");
+            // re-runs the request whose failure is currently displayed
+            this.retry = null;
             this.loadState = $(".unfold-load-state");
             this.meta = $(".unfold-tree-meta");
             this.expandAll = $("#jstree-expand-all");
@@ -35,6 +40,11 @@ ckan.module("unfold-init-jstree", function ($, _) {
             });
             this.expandAll.click(() => this.tree.jstree("open_all"));
             $("#jstree-collapse-all").click(() => this.tree.jstree("close_all"));
+            this.retryButton.click(() => {
+                if (this.retry) {
+                    this.retry();
+                }
+            });
 
             this._initJsTree();
         },
@@ -59,6 +69,9 @@ ckan.module("unfold-init-jstree", function ($, _) {
          * after "show more").
          */
         _loadNodes: function (node, callback) {
+            const instance = this.tree.jstree(true);
+
+            this._clearError();
             this.loadState.show();
 
             const limit = this.folderLimits[node.id] || this.options.pageSize;
@@ -72,7 +85,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
 
                     if (result.error) {
                         this._displayErrorReason(result.error);
-                        callback.call(this.tree.jstree(true), []);
+                        callback.call(instance, []);
                         return;
                     }
 
@@ -95,16 +108,34 @@ ckan.module("unfold-init-jstree", function ($, _) {
                         nodes = [];
                     }
 
-                    callback.call(this.tree.jstree(true), nodes);
+                    callback.call(instance, nodes);
                 })
                 .fail((xhr) => {
-                    const message = xhr.status
-                        ? ckan.i18n._("Could not load the archive listing") + " (HTTP " + xhr.status + ")"
-                        : ckan.i18n._("Could not load the archive listing");
-                    this._displayErrorReason(message);
-                    callback.call(this.tree.jstree(true), []);
+                    if (node.id === "#") {
+                        // An empty root lets jstree finish initialising and
+                        // drop its own "Loading ..." row; refresh() re-runs
+                        // this callback for the root.
+                        callback.call(instance, []);
+                        this._displayErrorReason(
+                            this._requestFailure(ckan.i18n._("Could not load the archive listing"), xhr),
+                            () => instance.refresh()
+                        );
+                        return;
+                    }
+
+                    // `false` leaves the folder unloaded, so opening it
+                    // again requests it again.
+                    callback.call(instance, false);
+                    this._displayErrorReason(
+                        this._requestFailure(ckan.i18n._("Could not load folder %(name)s", { name: node.id }), xhr),
+                        () => instance.load_node(node.id, (loaded, ok) => ok && instance.open_node(loaded))
+                    );
                 })
                 .always(() => this.loadState.hide());
+        },
+
+        _requestFailure: function (message, xhr) {
+            return xhr.status ? message + " (HTTP " + xhr.status + ")" : message;
         },
 
         _moreNode: function (parentId, shown, total) {
@@ -131,7 +162,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
             this.folderLimits[parentId] = current + this.options.pageSize;
 
             // reloading the folder replaces its children in a single redraw
-            instance.load_node(parentId, () => instance.open_node(parentId));
+            instance.load_node(parentId, (node, ok) => ok && instance.open_node(node));
         },
 
         _applyMode: function () {
@@ -163,6 +194,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
             // Large archive: matches may sit in folders that are not loaded
             // (or past their first page), so results are shown as a flat
             // list instead of highlighted in the tree.
+            this._clearError();
             this.loadState.show();
 
             $.ajax({
@@ -190,7 +222,10 @@ ckan.module("unfold-init-jstree", function ($, _) {
                         this._displayErrorReason(String(e));
                     }
                 })
-                .fail(() => this._displayErrorReason(ckan.i18n._("Search failed")))
+                .fail((xhr) => this._displayErrorReason(
+                    this._requestFailure(ckan.i18n._("Search failed"), xhr),
+                    () => this._search(query)
+                ))
                 .always(() => this.loadState.hide());
         },
 
@@ -256,10 +291,22 @@ ckan.module("unfold-init-jstree", function ($, _) {
             targetAnchor.focus();
         },
 
-        _displayErrorReason: function (error) {
-            $("#archive-tree--loader").remove();
-            $("#archive-tree-error span").text(error);
-            $("#archive-tree-error").show();
+        /**
+         * Show `error` above the tree. When `retry` is given a Retry button
+         * is offered that calls it; API errors such as a wrong password
+         * pass no retry because repeating the request cannot help.
+         */
+        _displayErrorReason: function (error, retry) {
+            this.loader.hide();
+            this.retry = retry || null;
+            this.retryButton.toggle(!!retry);
+            this.errorMessage.text(error);
+            this.errorBlock.show();
+        },
+
+        _clearError: function () {
+            this.retry = null;
+            this.errorBlock.hide();
         },
 
         _initJsTree: function () {
@@ -271,7 +318,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
 
             this.tree = $(this.el)
                 .on("ready.jstree", () => {
-                    $("#archive-tree--loader").remove();
+                    this.loader.hide();
                     this._setupKeyboardNavigation();
 
                     if (this.total < this.options.animationThreshold) {
