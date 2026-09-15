@@ -37,7 +37,7 @@ def test_view_info(plugin):
 
     assert info["name"] == "unfold_view"
     assert info["iframed"] is False
-    assert set(info["schema"]) == {"file_url", "archive_pass", "show_context_menu"}
+    assert set(info["schema"]) == {"archive_pass", "show_context_menu"}
 
 
 def test_new_upload_invalidates_the_cache(plugin, invalidated):
