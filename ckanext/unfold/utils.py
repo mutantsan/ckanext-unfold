@@ -109,6 +109,19 @@ def get_icon_by_format(fmt: str) -> str:
     return ICON_BY_FORMAT.get(fmt.lstrip(".").lower(), DEFAULT_ICON)
 
 
+def file_icon(fmt: str) -> str:
+    """Icon classes for a file node: the base font-awesome icon plus a
+    ``format-<ext>`` class, e.g. ``"fa fa-file-csv format-csv"``.
+
+    Folders never call this (they use a plain ``fa fa-folder``, matched by
+    its own selector); every adapter's file branch should.
+    """
+    fmt_clean = fmt.lstrip(".").lower()
+    icon = ICON_BY_FORMAT.get(fmt_clean, DEFAULT_ICON)
+
+    return f"{icon} format-{fmt_clean}" if fmt_clean else icon
+
+
 def name_from_path(path: str | None) -> str:
     return path.rstrip("/").split("/")[-1] if path else ""
 

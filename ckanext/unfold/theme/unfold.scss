@@ -12,6 +12,30 @@ $image-path: "../../images";
         position: relative;
         flex-basis: 350px;
         height: $height;
+
+        .form-control {
+            // room for the clear button so typed text never runs under it
+            padding-right: 2rem;
+        }
+
+        .jstree-search-clear {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 100%;
+            padding: 0;
+            border: 0;
+            background: transparent;
+
+            &:hover,
+            &:focus-visible {
+                color: var(--bs-body-color);
+            }
+        }
     }
 }
 
@@ -88,13 +112,13 @@ $image-path: "../../images";
 .jstree-anchor {
     display: inline-flex !important;
     width: 97% !important;
+}
 
-    .unfold-node-metadata {
-        margin-left: auto;
+.unfold-node-metadata {
+    margin-left: auto;
 
-        .unfold-node-size {
-            margin-right: 1rem;
-        }
+    .unfold-node-size {
+        margin-right: 2rem;
     }
 }
 
@@ -104,15 +128,15 @@ $image-path: "../../images";
     padding: 0.25rem 0.75rem;
     border-bottom: 1px solid #ced4da;
     margin-bottom: 0.5rem;
+}
 
-    .unf-cell-size {
-        margin-left: auto;
-        min-width: 73px;
-    }
+.unf-cell-size {
+    margin-left: auto;
+    min-width: 90px;
+}
 
-    .unf-cell-modified-at {
-        min-width: 101px;
-    }
+.unf-cell-modified-at {
+    min-width: 160px;
 }
 
 @mixin context-ul {

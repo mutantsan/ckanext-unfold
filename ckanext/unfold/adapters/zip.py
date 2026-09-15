@@ -62,9 +62,7 @@ class ZipAdapter(BaseAdapter):
         return unf_types.Node(
             id=entry.filename.rstrip("/") or "",
             text=unf_utils.name_from_path(entry.filename),
-            icon=(
-                "fa fa-folder" if entry.is_dir() else unf_utils.get_icon_by_format(fmt)
-            ),
+            icon="fa fa-folder" if entry.is_dir() else unf_utils.file_icon(fmt),
             state={"opened": True},
             parent="/".join(parts[:-1]) if parts[:-1] else "#",
             data=self._prepare_table_data(entry),

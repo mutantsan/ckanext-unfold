@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from html import escape
 from typing import Any
 
 from ckan import types
@@ -129,28 +128,10 @@ def _serialize_node(
 ) -> dict[str, Any]:
     """Turn a node into jstree JSON.
 
-    Names and metadata come from the archive and are untrusted; jstree
-    renders ``text`` as HTML, so everything is escaped here.
+    ``text`` is the plain entry name and ``size``/``modified_at`` stay in
+    ``data`` as plain strings.
     """
     data = asdict(node)
-    data["text"] = escape(node.text)
-
-    size = escape(str(node.data.get("size") or ""))
-    modified_at = escape(str(node.data.get("modified_at") or ""))
-
-    if size or modified_at:
-        data["text"] += "<span class='unfold-node-metadata'>"
-
-        if size:
-            data["text"] += f' <span class="unfold-node-size">{size}</span>'
-
-        if modified_at:
-            data["text"] += (
-                f' <span class="unfold-node-modified-at">{modified_at}</span>'
-            )
-
-        data["text"] += "</span>"
-
     data["state"] = {"opened": opened}
 
     if not flat:

@@ -31,7 +31,7 @@ class ArAdapter(BaseAdapter):
         return unf_types.Node(
             id=entry.name.rstrip("/") or "",
             text=unf_utils.name_from_path(entry.name),
-            icon=unf_utils.get_icon_by_format(unf_utils.get_format_from_name(name)),
+            icon=unf_utils.file_icon(unf_utils.get_format_from_name(name)),
             parent="/".join(parts[:-1]) if parts[:-1] else "#",
             data=self._prepare_table_data(entry),
         )

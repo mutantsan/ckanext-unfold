@@ -39,8 +39,8 @@ def test_small_archive_is_returned_whole(archive_resource):
     )
     assert node["parent"] == "test_archive/folder 1"
     assert node["state"] == {"opened": True}
-    assert node["text"].startswith("test.xlsx<span")
-    assert '<span class="unfold-node-size">5.1 KB</span>' in node["text"]
+    assert node["text"] == "test.xlsx"
+    assert node["data"]["size"] == "5.1 KB"
 
 
 @pytest.mark.ckan_config("ckanext.unfold.expand_nodes_threshold", 1)

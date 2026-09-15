@@ -72,6 +72,24 @@ def test_get_icon_by_format(fmt: str, icon: str):
     assert utils.get_icon_by_format(fmt) == icon
 
 
+@pytest.mark.parametrize(
+    ("fmt", "icon"),
+    [
+        ("png", "fa fa-file-image format-png"),
+        (".PNG", "fa fa-file-image format-png"),
+        ("csv", "fa fa-file-csv format-csv"),
+        # unknown extension: falls back to the default icon, keeps its class
+        # (a theme may still style `.format-md` even without a dedicated
+        # font-awesome icon for it)
+        ("md", f"{utils.DEFAULT_ICON} format-md"),
+        # no extension at all: nothing to key a format class on
+        ("", utils.DEFAULT_ICON),
+    ],
+)
+def test_file_icon(fmt: str, icon: str):
+    assert utils.file_icon(fmt) == icon
+
+
 def test_name_and_format_from_path():
     assert utils.name_from_path("a/b/c.txt") == "c.txt"
     assert utils.name_from_path("a/b/") == "b"

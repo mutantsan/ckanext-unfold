@@ -10,7 +10,12 @@ def _node(**data) -> Node:
     )
 
 
-def test_untrusted_names_and_metadata_are_escaped():
+def test_untrusted_names_and_metadata_are_returned_as_plain_text():
+    """Nothing here embeds `text`/`data` in HTML, so nothing needs escaping:
+    the widget renders `text` through jstree's `core.force_text` (a real DOM
+    text node, see `unfold-init-jstree.js`) and builds the metadata spans in
+    JS with `textContent`. A hostile name or metadata string is returned
+    byte-for-byte; it is the client's job never to treat it as markup."""
     node = Node(
         id="<b>x</b>.txt",
         text='<img src=x onerror="alert(1)">.txt',
@@ -21,32 +26,27 @@ def test_untrusted_names_and_metadata_are_escaped():
 
     out = action._serialize_node(node, opened=True)
 
-    assert "<img" not in out["text"]
-    assert "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;.txt" in out["text"]
-    assert "&lt;i&gt;1 KB&lt;/i&gt;" in out["text"]
-    assert "1 &amp; 2" in out["text"]
+    assert out["text"] == '<img src=x onerror="alert(1)">.txt'
     assert out["id"] == "<b>x</b>.txt"
+    assert out["data"] == {"size": "<i>1 KB</i>", "modified_at": "1 & 2"}
 
 
-def test_metadata_is_rendered_as_spans():
+def test_metadata_stays_plain_data_not_markup():
     out = action._serialize_node(
         _node(size="5.1 KB", modified_at="01/01/2024 - 10:00"), opened=True
     )
 
-    assert out["text"] == (
-        "x.txt<span class='unfold-node-metadata'>"
-        ' <span class="unfold-node-size">5.1 KB</span>'
-        ' <span class="unfold-node-modified-at">01/01/2024 - 10:00</span>'
-        "</span>"
-    )
+    assert out["text"] == "x.txt"
+    assert out["data"] == {"size": "5.1 KB", "modified_at": "01/01/2024 - 10:00"}
     assert out["state"] == {"opened": True}
     assert out["parent"] == "dir"
 
 
-def test_empty_metadata_adds_no_markup():
+def test_empty_metadata_is_returned_as_is():
     out = action._serialize_node(_node(size="", modified_at=""), opened=False)
 
     assert out["text"] == "x.txt"
+    assert out["data"] == {"size": "", "modified_at": ""}
     assert out["state"] == {"opened": False}
 
 

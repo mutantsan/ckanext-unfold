@@ -26,16 +26,20 @@ ckan.module("unfold-init-jstree", function ($, _) {
             this.meta = $(".unfold-tree-meta");
             this.expandAll = $("#jstree-expand-all");
             this.results = $("#archive-search-results");
+            this.searchInput = $("#jstree-search");
+            this.searchClear = $("#jstree-search-clear");
             // "full": every node is in the DOM; "lazy": folders load on open
             this.mode = null;
             this.total = 0;
             // lazy mode: how many children each folder currently shows
             this.folderLimits = {};
 
-            $("#jstree-search").on("change", (e) => this._search($(e.target).val()));
-            $("#jstree-search-run").click(() => this._search($("#jstree-search").val()));
-            $("#jstree-search-clear").click(() => {
-                $("#jstree-search").val("");
+            this.searchInput.on("input", this._toggleSearchClear);
+            this.searchInput.on("change", (e) => this._search($(e.target).val()));
+            $("#jstree-search-run").click(() => this._search(this.searchInput.val()));
+            this.searchClear.click(() => {
+                this.searchInput.val("").trigger("focus");
+                this._toggleSearchClear();
                 this._clearSearch();
             });
             this.expandAll.click(() => this.tree.jstree("open_all"));
@@ -46,7 +50,14 @@ ckan.module("unfold-init-jstree", function ($, _) {
                 }
             });
 
+            this._observeMetadata();
             this._initJsTree();
+        },
+
+        teardown: function () {
+            if (this._metadataObserver) {
+                this._metadataObserver.disconnect();
+            }
         },
 
         _payload: function (extra) {
@@ -263,6 +274,10 @@ ckan.module("unfold-init-jstree", function ($, _) {
             this._applyMode();
         },
 
+        _toggleSearchClear: function () {
+            this.searchClear.toggle(this.searchInput.val().length > 0);
+        },
+
         _setupKeyboardNavigation: function () {
             // Handle TAB, SHIFT+TAB navigation
             this.tree.on("keydown.jstree", ".jstree-anchor", (e) => {
@@ -340,7 +355,7 @@ ckan.module("unfold-init-jstree", function ($, _) {
                         // animation is decided once the size is known
                         animation: 0,
                         multiple: false,
-                        // nodes are sorted on the server; no sort plugin needed
+                        force_text: true,
                     },
                     search: {
                         show_only_matches: this.options.searchShowOnlyMatches,
@@ -371,6 +386,81 @@ ckan.module("unfold-init-jstree", function ($, _) {
                     }
                 });
             }
+        },
+
+        /**
+         * jstree redraws by emptying and rebuilding whichever part of the
+         * tree changed (a folder opening, a page loading, a search
+         * filtering), so there is no single reliable "node rendered" event
+         * to hook. Watching the DOM directly catches every anchor jstree
+         * ever adds, however it got there.
+         */
+        _observeMetadata: function () {
+            this._metadataObserver = new MutationObserver((mutations) => {
+                const instance = this.tree.jstree(true);
+
+                if (!instance) {
+                    return;
+                }
+
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((added) => {
+                        if (added.nodeType !== Node.ELEMENT_NODE) {
+                            return;
+                        }
+
+                        if (added.matches(".jstree-anchor")) {
+                            this._decorateAnchor(added, instance);
+                        }
+
+                        added.querySelectorAll(".jstree-anchor").forEach((anchor) =>
+                            this._decorateAnchor(anchor, instance)
+                        );
+                    });
+                });
+            });
+
+            this._metadataObserver.observe(this.el[0], { childList: true, subtree: true });
+        },
+
+        /**
+         * Append the size/modified-at spans jstree does not know about.
+         * Built with textContent, never innerHTML: `data.size` and
+         * `data.modified_at` come from the archive and are untrusted.
+         */
+        _decorateAnchor: function (anchor, instance) {
+            if (anchor.dataset.unfoldDecorated) {
+                return;
+            }
+
+            anchor.dataset.unfoldDecorated = "1";
+
+            const li = anchor.closest(".jstree-node");
+            const node = li && instance.get_node(li.id);
+            const data = node && node.data;
+
+            if (!data || (!data.size && !data.modified_at)) {
+                return;
+            }
+
+            const meta = document.createElement("span");
+            meta.className = "unfold-node-metadata";
+
+            if (data.size) {
+                const size = document.createElement("span");
+                size.className = "unfold-node-size";
+                size.textContent = data.size;
+                meta.appendChild(size);
+            }
+
+            if (data.modified_at) {
+                const modifiedAt = document.createElement("span");
+                modifiedAt.className = "unfold-node-modified-at";
+                modifiedAt.textContent = data.modified_at;
+                meta.appendChild(modifiedAt);
+            }
+
+            anchor.appendChild(meta);
         },
 
         _getContextMenuItems: function (node) {
