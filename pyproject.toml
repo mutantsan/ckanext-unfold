@@ -15,7 +15,7 @@ maintainers = [
 ]
 license = {text = "AGPL"}
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -26,6 +26,7 @@ keywords = ["CKAN"]
 urls = {Homepage = "https://github.com/DataShades/ckanext-unfold"}
 dependencies = [
     "rarfile>=4.0",
+    "cryptography>=41.0.0",
     "py7zr>=1.1.0",
     "rpmfile>=2.1.0",
     "ar>=1.0.0,<2.0.0",

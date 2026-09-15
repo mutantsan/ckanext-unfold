@@ -23,6 +23,12 @@ Python >= 3.10
 
 Redis (for caching)
 
+Archives are only ever listed, never extracted, so RAR support needs no
+`unrar`/`unar`/`bsdtar` binary on the host. A RAR archive with encrypted
+filenames (not just encrypted file contents) is the one exception: listing
+it needs a crypto backend, which the `cryptography` dependency provides
+automatically.
+
 ## Configuration
 
 ```ini

@@ -95,6 +95,19 @@ def test_rar_listing_needs_no_external_tool(
     assert len(tree) == num_nodes
 
 
+def test_rar_crypto_backend_is_available():
+    """A RAR5 archive with encrypted filenames (not just file contents)
+    cannot be listed at all without a crypto backend (``rarfile.NoCrypto``);
+    ``cryptography`` is declared for exactly this, so it must actually wire
+    up. There is no such fixture to exercise end to end (creating one needs
+    a real ``rar`` binary, which nothing in CI provides), so this pins the
+    one signal rarfile exposes for "a backend is importable and usable".
+    """
+    assert rarfile._have_crypto != 0, (
+        "no AES backend available to rarfile; is `cryptography` installed?"
+    )
+
+
 @pytest.mark.usefixtures("with_request_context")
 def test_build_complex_tree(archive_url):
     tree = build_tree("zip", archive_url("test_complex_nested.zip"))
