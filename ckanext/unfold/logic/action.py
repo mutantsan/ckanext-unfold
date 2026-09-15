@@ -5,6 +5,7 @@ from typing import Any
 
 from ckan import types
 from ckan.logic import validate
+from ckan.logic.action.get import resource_view_show as _core_resource_view_show
 from ckan.plugins import toolkit as tk
 
 import ckanext.unfold.config as unf_config
@@ -13,6 +14,9 @@ import ckanext.unfold.index as unf_index
 import ckanext.unfold.logic.schema as unf_schema
 import ckanext.unfold.types as unf_types
 import ckanext.unfold.utils as unf_utils
+
+
+VIEW_TYPE = "unfold_view"
 
 
 @tk.side_effect_free
@@ -113,14 +117,61 @@ def _load_resource_and_view(
     resource_view: dict[str, Any] = {}
 
     if data_dict.get("view_id"):
-        resource_view = tk.get_action("resource_view_show")(
-            context, {"id": data_dict["view_id"]}
-        )
+        # The core action directly, bypassing `resource_view_show` below:
+        # this needs the real `archive_pass` to unlock the archive server
+        # side, which is exactly what that chained action strips for anyone
+        # without `resource_update` -- the password itself never reaches the
+        # caller either way, only the resulting listing does.
+        resource_view = _core_resource_view_show(context, {"id": data_dict["view_id"]})
 
         if resource_view.get("resource_id") != resource["id"]:
             raise unf_exception.UnfoldError("Error. View does not belong to resource")
 
     return resource, resource_view
+
+
+@tk.chained_action
+@tk.side_effect_free
+def resource_view_show(
+    next_action: types.Action, context: types.Context, data_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Strip ``archive_pass`` from an Unfold view for anyone who cannot edit it.
+
+    ``resource_view_show`` is a public, read-only action: CKAN's dictization
+    merges the view's ``config`` (where the password lives, see
+    ``logic/schema.py``) straight into the returned dict, so without this,
+    anyone who can read the resource could read the archive's password back
+    out through this action.
+    """
+    view = next_action(context, data_dict)
+    _strip_password_if_unauthorized(context, view)
+    return view
+
+
+@tk.chained_action
+@tk.side_effect_free
+def resource_view_list(
+    next_action: types.Action, context: types.Context, data_dict: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Same as ``resource_view_show`` above, for the list action."""
+    views = next_action(context, data_dict)
+
+    for view in views:
+        _strip_password_if_unauthorized(context, view)
+
+    return views
+
+
+def _strip_password_if_unauthorized(
+    context: types.Context, view: dict[str, Any]
+) -> None:
+    if view.get("view_type") != VIEW_TYPE or not view.get("archive_pass"):
+        return
+
+    try:
+        tk.check_access("resource_update", context, {"id": view["resource_id"]})
+    except tk.NotAuthorized:
+        view["archive_pass"] = None
 
 
 def _serialize_node(

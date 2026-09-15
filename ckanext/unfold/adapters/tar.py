@@ -8,7 +8,7 @@ import lzma
 from io import BytesIO
 from tarfile import TarError, TarInfo
 from tarfile import open as tar_open
-from typing import IO, cast
+from typing import IO
 
 import ckanext.unfold.config as unf_config
 import ckanext.unfold.exception as unf_exception

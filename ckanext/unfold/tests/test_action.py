@@ -10,6 +10,10 @@ import ckan.plugins.toolkit as tk
 from ckan.tests import factories
 from ckan.tests.helpers import call_action
 
+from ckanext.unfold.logic.action import (
+    _load_resource_and_view,
+    _strip_password_if_unauthorized,
+)
 from ckanext.unfold.tests.helpers import BASE_URL, served
 
 pytestmark = [
@@ -185,3 +189,113 @@ def test_private_dataset_requires_read_access():
         )
 
     assert result["mode"] == "full"
+
+
+@pytest.fixture
+def password_protected_resource():
+    """A password-protected RAR resource with ``archive_pass`` on its unfold
+    view, in an org where ``editor`` can update the resource and ``member``
+    can only read it. RAR is the format whose adapter actually reads
+    ``archive_pass`` to unlock the listing (see ``adapters/rar.py``).
+    """
+    editor = factories.User()
+    member = factories.User()
+    org = factories.Organization(
+        users=[
+            {"name": editor["name"], "capacity": "editor"},
+            {"name": member["name"], "capacity": "member"},
+        ]
+    )
+    dataset = factories.Dataset(owner_org=org["id"])
+    resource = factories.Resource(
+        package_id=dataset["id"], url=BASE_URL + "secret.rar", format="rar"
+    )
+    view = call_action(
+        "resource_view_create",
+        resource_id=resource["id"],
+        view_type="unfold_view",
+        title="Unfold",
+        archive_pass="secret",  # noqa: S106
+    )
+
+    return {"editor": editor, "member": member, "resource": resource, "view": view}
+
+
+def test_password_is_hidden_from_users_without_update_access(
+    password_protected_resource,
+):
+    member = password_protected_resource["member"]
+    editor = password_protected_resource["editor"]
+    view_id = password_protected_resource["view"]["id"]
+
+    anon = call_action(
+        "resource_view_show", {"user": "", "ignore_auth": False}, id=view_id
+    )
+    assert anon["archive_pass"] is None
+
+    as_member = call_action(
+        "resource_view_show",
+        {"user": member["name"], "ignore_auth": False},
+        id=view_id,
+    )
+    assert as_member["archive_pass"] is None
+
+    as_editor = call_action(
+        "resource_view_show",
+        {"user": editor["name"], "ignore_auth": False},
+        id=view_id,
+    )
+    assert as_editor["archive_pass"] == "secret"  # noqa: S105
+
+    as_sysadmin = call_action("resource_view_show", id=view_id)
+    assert as_sysadmin["archive_pass"] == "secret"  # noqa: S105
+
+
+def test_password_is_hidden_in_resource_view_list_too(password_protected_resource):
+    member = password_protected_resource["member"]
+    resource_id = password_protected_resource["resource"]["id"]
+
+    views = call_action(
+        "resource_view_list",
+        {"user": member["name"], "ignore_auth": False},
+        id=resource_id,
+    )
+
+    assert len(views) == 1
+    assert views[0]["archive_pass"] is None
+
+
+def test_other_view_types_are_left_alone():
+    """The helper is scoped to unfold views; a plain dict is enough here --
+    it never reaches ``check_access`` (and so needs no resource/DB at all)
+    because the ``view_type`` check short-circuits first.
+    """
+    view = {
+        "view_type": "text_view",
+        "archive_pass": "secret",
+        "resource_id": "does-not-matter",
+    }
+
+    _strip_password_if_unauthorized({"user": "", "ignore_auth": False}, view)
+
+    assert view["archive_pass"] == "secret"  # noqa: S105
+
+
+def test_password_is_available_internally_for_read_only_users(
+    password_protected_resource,
+):
+    """``_load_resource_and_view`` must still see the real password for a
+    user without ``resource_update``, since it is used server side to unlock
+    a protected archive -- only ``resource_view_show``/``resource_view_list``
+    (called directly by a caller) strip it.
+    """
+    member = password_protected_resource["member"]
+    resource_id = password_protected_resource["resource"]["id"]
+    view_id = password_protected_resource["view"]["id"]
+
+    _, resource_view = _load_resource_and_view(
+        {"user": member["name"], "ignore_auth": False},
+        {"id": resource_id, "view_id": view_id},
+    )
+
+    assert resource_view["archive_pass"] == "secret"  # noqa: S105
